@@ -1,8 +1,8 @@
 "use client";
 
 import { useState, useEffect } from 'react';
-import { getRuns, deleteRun } from '../lib/api';
-import { RunSummary } from '../lib/types';
+import { getRuns, deleteRun } from '../../lib/api';
+import { RunSummary } from '../../lib/types';
 
 function getStatusBadgeClass(status: string): string {
   switch (status) {
@@ -59,14 +59,14 @@ export default function RunsPage() {
   }
 
   async function handleDelete(id: string) {
-    if (!confirm('Вы уверены, что хотите удалить этот запуск?')) {
+    if (!confirm('Вы уверены, что хотите удалить этот запуск? Это действие нельзя отменить.')) {
       return;
     }
 
     try {
       setDeletingId(id);
       await deleteRun(id);
-      setRuns(prev => prev.filter(run => run.id !== id));
+      await loadRuns();
     } catch (err: any) {
       alert(err.message || 'Ошибка при удалении запуска');
     } finally {
@@ -85,9 +85,12 @@ export default function RunsPage() {
 
   return (
     <div className="container">
-      <h1>Запуски сверки</h1>
+      <div className="flex justify-between items-center mb-6">
+        <h1>Запуски сверки</h1>
+        <a href="/" className="secondary">← На главную</a>
+      </div>
 
-      {error && <div className="error">{error}</div>}
+      {error && <div className="error mb-4">{error}</div>}
 
       <div className="card">
         <div className="table-container">
@@ -105,7 +108,7 @@ export default function RunsPage() {
             <tbody>
               {runs.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="empty-state">Нет запусков</td>
+                  <td colSpan={6} className="empty-state">Нет запусков сверки</td>
                 </tr>
               ) : (
                 runs.map((run) => (
@@ -124,9 +127,9 @@ export default function RunsPage() {
                       {formatUSDT(run.usdt_difference)}
                     </td>
                     <td>
-                      <div className="flex gap-2 items-center">
+                      <div className="flex gap-2">
                         <a href={`/runs/${run.id}`} className="text-sm">
-                          Подробнее
+                          Подробнее →
                         </a>
                         <button
                           className="danger text-sm"
@@ -143,10 +146,6 @@ export default function RunsPage() {
             </tbody>
           </table>
         </div>
-      </div>
-
-      <div className="flex gap-4">
-        <a href="/" className="secondary">← На главную</a>
       </div>
     </div>
   );

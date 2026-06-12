@@ -19,8 +19,9 @@ function getStatusBadgeClass(status: string): string {
   }
 }
 
-function formatCurrency(value: number): string {
-  return new Intl.NumberFormat('ru-RU', { style: 'currency', currency: 'RUB' }).format(value);
+function formatCurrency(value: number | string): string {
+  const num = typeof value === 'string' ? parseFloat(value) || 0 : value;
+  return new Intl.NumberFormat('ru-RU', { style: 'currency', currency: 'RUB' }).format(num);
 }
 
 function formatUSDT(value: number): string {
@@ -39,11 +40,17 @@ function formatDate(dateStr: string): string {
   });
 }
 
+function formatRate(value: string | number): string {
+  const num = typeof value === 'string' ? parseFloat(value) || 0 : value;
+  return (num * 100).toFixed(2) + '%';
+}
+
 export default function Home() {
   const [runs, setRuns] = useState<RunSummary[]>([]);
   const [commissionGroups, setCommissionGroups] = useState<CommissionGroup[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [runsError, setRunsError] = useState<string | null>(null);
+  const [groupsError, setGroupsError] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [uploadSuccess, setUploadSuccess] = useState<string | null>(null);
@@ -69,17 +76,35 @@ export default function Home() {
   }, []);
 
   async function loadData() {
+    setLoading(true);
+    setRunsError(null);
+    setGroupsError(null);
+    
     try {
-      setLoading(true);
-      setError(null);
-      const [runsData, groupsData] = await Promise.all([
+      const results = await Promise.allSettled([
         getRuns(),
         getCommissionGroups()
       ]);
-      setRuns(runsData || []);
-      setCommissionGroups(groupsData || []);
+
+      // Handle runs result
+      const runsResult = results[0];
+      if (runsResult.status === 'fulfilled') {
+        setRuns(runsResult.value || []);
+      } else {
+        setRunsError(runsResult.reason?.message || 'Ошибка загрузки запусков');
+        setRuns([]);
+      }
+
+      // Handle commission groups result
+      const groupsResult = results[1];
+      if (groupsResult.status === 'fulfilled') {
+        setCommissionGroups(groupsResult.value || []);
+      } else {
+        setGroupsError(groupsResult.reason?.message || 'Ошибка загрузки ставок');
+        setCommissionGroups([]);
+      }
     } catch (err: any) {
-      setError(err.message || 'Ошибка загрузки данных');
+      console.error('Unexpected error in loadData:', err);
     } finally {
       setLoading(false);
     }
@@ -178,8 +203,6 @@ export default function Home() {
   return (
     <div className="container">
       <h1>OnliPay Reconciliation Dashboard</h1>
-
-      {error && <div className="error">{error}</div>}
 
       <div className="grid grid-2">
         {/* Upload Card */}
@@ -351,11 +374,15 @@ export default function Home() {
           <div className="card-header">
             <div className="card-title">Ставки комиссий OnliPay</div>
           </div>
+          
+          {groupsError && <div className="error mb-4">{groupsError}</div>}
+          
           <div className="table-container">
             <table>
               <thead>
                 <tr>
                   <th>Группа</th>
+                  <th>Gateway Point</th>
                   <th>Ставка</th>
                   <th>Мин. комиссия</th>
                   <th>Фикс. комиссия</th>
@@ -364,13 +391,14 @@ export default function Home() {
               <tbody>
                 {commissionGroups.length === 0 ? (
                   <tr>
-                    <td colSpan={4} className="empty-state">Нет данных</td>
+                    <td colSpan={5} className="empty-state">Нет данных о ставках</td>
                   </tr>
                 ) : (
                   commissionGroups.map((group) => (
                     <tr key={group.group_code}>
-                      <td>{group.group_code}</td>
-                      <td>{group.rate.toFixed(4)}</td>
+                      <td>{group.label || group.group_code}</td>
+                      <td className="text-sm">{group.gateway_point}</td>
+                      <td>{formatRate(group.commission_rate)}</td>
                       <td>{formatCurrency(group.min_commission)}</td>
                       <td>{formatCurrency(group.fixed_commission)}</td>
                     </tr>
@@ -390,6 +418,9 @@ export default function Home() {
         <div className="card-header">
           <div className="card-title">Быстрые итоги</div>
         </div>
+        
+        {runsError && <div className="error mb-4">{runsError}</div>}
+        
         <div className="grid grid-4">
           <div className="stat-card">
             <div className="stat-value">{runs.length}</div>
@@ -430,7 +461,7 @@ export default function Home() {
             <tbody>
               {runs.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="empty-state">Нет запусков</td>
+                  <td colSpan={6} className="empty-state">Пока нет запусков сверки</td>
                 </tr>
               ) : (
                 runs.slice(0, 10).map((run) => (

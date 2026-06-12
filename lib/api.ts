@@ -7,29 +7,71 @@ interface ApiError {
 
 async function apiFetch<T>(url: string, options?: RequestInit): Promise<T> {
   const fullUrl = `${API_BASE_URL}${url}`;
+  const timeout = 15000; // 15 seconds timeout
   
-  const response = await fetch(fullUrl, options);
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeout);
   
-  if (!response.ok) {
-    let error: ApiError;
-    try {
-      const json = await response.json();
-      error = { message: json.message || 'Ошибка сервера', status: response.status };
-    } catch {
-      error = { message: `HTTP ${response.status}: ${response.statusText}`, status: response.status };
+  try {
+    const response = await fetch(fullUrl, {
+      ...options,
+      signal: controller.signal
+    });
+    
+    clearTimeout(timeoutId);
+    
+    if (!response.ok) {
+      let error: ApiError;
+      try {
+        const json = await response.json();
+        error = { message: json.message || 'Ошибка сервера', status: response.status };
+      } catch {
+        error = { message: `HTTP ${response.status}: ${response.statusText}`, status: response.status };
+      }
+      throw error;
     }
-    throw error;
+    
+    // Handle empty response
+    const contentType = response.headers.get('content-type');
+    if (!contentType || !contentType.includes('application/json')) {
+      return {} as T;
+    }
+    
+    const text = await response.text();
+    if (!text.trim()) {
+      return {} as T;
+    }
+    
+    return JSON.parse(text);
+  } catch (err: any) {
+    clearTimeout(timeoutId);
+    if (err.name === 'AbortError') {
+      throw { message: 'Таймаут запроса (15 сек)', status: 408 };
+    }
+    throw err;
   }
-  
-  return response.json();
 }
 
 export async function getFrontConfig() {
   return apiFetch('/api/v1/front/config');
 }
 
-export async function getRuns() {
-  return apiFetch('/api/v1/reconciliation/runs');
+export async function getRuns(): Promise<any[]> {
+  try {
+    const data = await apiFetch('/api/v1/reconciliation/runs');
+    
+    // Handle various response formats
+    if (!data) return [];
+    if (Array.isArray(data)) return data;
+    if (data.items && Array.isArray(data.items)) return data.items;
+    if (data.runs && Array.isArray(data.runs)) return data.runs;
+    if (data.data && Array.isArray(data.data)) return data.data;
+    
+    return [];
+  } catch (err: any) {
+    // Return empty array on error, let caller handle it
+    return [];
+  }
 }
 
 export async function getRun(id: string) {
@@ -41,22 +83,41 @@ export async function getRunCounts(id: string) {
 }
 
 export async function createRun(formData: FormData) {
-  return fetch(`${API_BASE_URL}/api/v1/reconciliation/runs`, {
-    method: 'POST',
-    body: formData
-  }).then(async (res) => {
-    if (!res.ok) {
+  const fullUrl = `${API_BASE_URL}/api/v1/reconciliation/runs`;
+  const timeout = 30000; // 30 seconds for file upload
+  
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeout);
+  
+  try {
+    const response = await fetch(fullUrl, {
+      method: 'POST',
+      body: formData,
+      signal: controller.signal
+      // Don't set Content-Type for FormData - browser sets it automatically with boundary
+    });
+    
+    clearTimeout(timeoutId);
+    
+    if (!response.ok) {
       let error: ApiError;
       try {
-        const json = await res.json();
-        error = { message: json.message || 'Ошибка сервера', status: res.status };
+        const json = await response.json();
+        error = { message: json.message || 'Ошибка сервера', status: response.status };
       } catch {
-        error = { message: `HTTP ${res.status}: ${res.statusText}`, status: res.status };
+        error = { message: `HTTP ${response.status}: ${response.statusText}`, status: response.status };
       }
       throw error;
     }
-    return res.json();
-  });
+    
+    return response.json();
+  } catch (err: any) {
+    clearTimeout(timeoutId);
+    if (err.name === 'AbortError') {
+      throw { message: 'Таймаут загрузки файла (30 сек)', status: 408 };
+    }
+    throw err;
+  }
 }
 
 export async function acceptRun(id: string) {
@@ -75,15 +136,15 @@ export async function getCommissionGroups() {
   return apiFetch('/api/v1/reference/onlipay-groups');
 }
 
-export async function updateCommissionGroup(group: { group_code: string; rate: number; min_commission: number; fixed_commission: number }) {
-  return apiFetch(`/api/v1/reference/onlipay-groups/${group.group_code}`, {
+export async function updateCommissionGroup(group_code: string, data: {
+  commission_rate: string;
+  min_commission: string;
+  fixed_commission: string;
+}) {
+  return apiFetch(`/api/v1/reference/onlipay-groups/${group_code}`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      rate: group.rate,
-      min_commission: group.min_commission,
-      fixed_commission: group.fixed_commission
-    })
+    body: JSON.stringify(data)
   });
 }
 

@@ -36,9 +36,12 @@ export interface RunCounts {
 
 export interface CommissionGroup {
   group_code: string;
-  rate: number;
-  min_commission: number;
-  fixed_commission: number;
+  label: string;
+  gateway_point: string;
+  commission_rate: string;
+  min_commission: string;
+  fixed_commission: string;
+  updated_at?: string | null;
 }
 
 export interface FrontConfig {

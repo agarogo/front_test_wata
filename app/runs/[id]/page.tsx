@@ -1,9 +1,9 @@
 "use client";
 
 import { useState, useEffect } from 'react';
-import { useParams, useRouter } from 'next/navigation';
-import { getRun, getRunCounts, acceptRun, deleteRun, getReportXlsxUrl, getReportTxtUrl } from '../lib/api';
-import { RunDetail, RunCounts } from '../lib/types';
+import { useParams } from 'next/navigation';
+import { getRun, getRunCounts, acceptRun, getReportXlsxUrl, getReportTxtUrl } from '../../../lib/api';
+import { RunDetail, RunCounts } from '../../../lib/types';
 
 function getStatusBadgeClass(status: string): string {
   switch (status) {
@@ -17,21 +17,6 @@ function getStatusBadgeClass(status: string): string {
       return 'badge-accepted';
     default:
       return '';
-  }
-}
-
-function getStatusText(status: string): string {
-  switch (status) {
-    case 'processing':
-      return 'В обработке';
-    case 'completed':
-      return 'Завершено';
-    case 'failed':
-      return 'Ошибка';
-    case 'accepted':
-      return 'Принято';
-    default:
-      return status;
   }
 }
 
@@ -55,78 +40,69 @@ function formatDate(dateStr: string): string {
   });
 }
 
-function formatNumber(value: number): string {
-  return new Intl.NumberFormat('ru-RU').format(value);
+function formatRate(value: number): string {
+  return (value * 100).toFixed(2) + '%';
 }
 
 export default function RunDetailPage() {
   const params = useParams();
-  const router = useRouter();
-  const runId = params.id as string;
+  const id = Array.isArray(params.id) ? params.id[0] : params.id;
 
   const [run, setRun] = useState<RunDetail | null>(null);
   const [counts, setCounts] = useState<RunCounts | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [accepting, setAccepting] = useState(false);
-  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
-    if (!runId) {
+    if (!id) {
       setError('ID запуска не указан');
       setLoading(false);
       return;
     }
     loadData();
-  }, [runId]);
+  }, [id]);
 
   async function loadData() {
     try {
       setLoading(true);
       setError(null);
-      const [runData, countsData] = await Promise.all([
-        getRun(runId),
-        getRunCounts(runId)
+      
+      const [runData, countsData] = await Promise.allSettled([
+        getRun(id),
+        getRunCounts(id)
       ]);
-      setRun(runData);
-      setCounts(countsData);
+
+      if (runData.status === 'fulfilled') {
+        setRun(runData.value || null);
+      } else {
+        setError(runData.reason?.message || 'Ошибка загрузки данных запуска');
+      }
+
+      if (countsData.status === 'fulfilled') {
+        setCounts(countsData.value || null);
+      }
     } catch (err: any) {
-      setError(err.message || 'Ошибка загрузки данных запуска');
+      setError(err.message || 'Ошибка загрузки данных');
     } finally {
       setLoading(false);
     }
   }
 
   async function handleAccept() {
-    if (!confirm('Вы уверены, что хотите принять эту сверку? Это обновит постоянные таблицы.')) {
+    if (!confirm('Подтвердить этот запуск сверки?')) {
       return;
     }
 
     try {
       setAccepting(true);
-      await acceptRun(runId);
-      alert('Сверка успешно принята!');
+      await acceptRun(id);
       await loadData();
+      alert('Запуск успешно подтверждён');
     } catch (err: any) {
-      alert(err.message || 'Ошибка при принятии сверки');
+      alert(err.message || 'Ошибка при подтверждении запуска');
     } finally {
       setAccepting(false);
-    }
-  }
-
-  async function handleDelete() {
-    if (!confirm('Вы уверены, что хотите удалить этот запуск? Это действие нельзя отменить.')) {
-      return;
-    }
-
-    try {
-      setDeleting(true);
-      await deleteRun(runId);
-      router.push('/runs');
-    } catch (err: any) {
-      alert(err.message || 'Ошибка при удалении запуска');
-    } finally {
-      setDeleting(false);
     }
   }
 
@@ -139,34 +115,52 @@ export default function RunDetailPage() {
     );
   }
 
-  if (error || !run) {
+  if (error && !run) {
     return (
       <div className="container">
-        <h1>Детали запуска</h1>
-        <div className="error">{error || 'Запуск не найден'}</div>
-        <a href="/runs" className="secondary">← Вернуться к списку</a>
+        <div className="flex justify-between items-center mb-6">
+          <h1>Детали запуска</h1>
+          <a href="/runs" className="secondary">← К списку</a>
+        </div>
+        <div className="error">{error}</div>
       </div>
     );
   }
 
+  if (!run) {
+    return (
+      <div className="container">
+        <div className="flex justify-between items-center mb-6">
+          <h1>Детали запуска</h1>
+          <a href="/runs" className="secondary">← К списку</a>
+        </div>
+        <div className="empty-state">Запуск не найден</div>
+      </div>
+    );
+  }
+
+  const xlsxUrl = getReportXlsxUrl(id);
+  const txtUrl = getReportTxtUrl(id);
+
   return (
     <div className="container">
       <div className="flex justify-between items-center mb-6">
-        <h1>Запуск сверки: {run.id.slice(0, 8)}...</h1>
+        <h1>Запуск сверки: {id.slice(0, 8)}...</h1>
         <div className="flex gap-2">
-          <a href="/runs" className="secondary">← Назад</a>
+          <a href="/runs" className="secondary">← К списку</a>
           {run.status === 'completed' && (
-            <button className="success" onClick={handleAccept} disabled={accepting}>
-              {accepting ? 'Принятие...' : 'Принять сверку'}
+            <button
+              className="primary"
+              onClick={handleAccept}
+              disabled={accepting || run.status === 'accepted'}
+            >
+              {accepting ? 'Подтверждение...' : run.status === 'accepted' ? 'Подтверждено' : 'Подтвердить'}
             </button>
           )}
-          <button className="danger" onClick={handleDelete} disabled={deleting}>
-            {deleting ? 'Удаление...' : 'Удалить'}
-          </button>
         </div>
       </div>
 
-      {error && <div className="error">{error}</div>}
+      {error && <div className="error mb-4">{error}</div>}
 
       <div className="grid grid-2">
         {/* Status Card */}
@@ -174,69 +168,121 @@ export default function RunDetailPage() {
           <div className="card-header">
             <div className="card-title">Статус</div>
           </div>
-          <div className="flex items-center gap-4 mb-4">
+          <div className="stat-card large">
             <span className={`badge ${getStatusBadgeClass(run.status)}`}>
-              {getStatusText(run.status)}
-            </span>
-            <span className="text-sm text-muted">
-              Создан: {formatDate(run.created_at)}
+              {run.status}
             </span>
           </div>
-          <div className="text-sm">
-            <p><strong>Период:</strong> {run.period_start} — {run.period_end}</p>
-            <p><strong>Курс валюты:</strong> {formatNumber(run.fx_rate)}</p>
-            <p><strong>Сумма в USDT:</strong> {formatUSDT(run.gateway_usdt_amount)}</p>
+          <div className="text-sm mt-4">
+            <div>Период: {run.period_start} — {run.period_end}</div>
+            <div>Создан: {formatDate(run.created_at)}</div>
           </div>
         </div>
 
-        {/* Summary Card */}
+        {/* Counts Card */}
         <div className="card">
           <div className="card-header">
-            <div className="card-title">Итоги сверки</div>
+            <div className="card-title">Сводка транзакций</div>
           </div>
-          <div className="grid grid-2">
-            <div>
-              <div className="text-sm text-muted">Разница USDT</div>
-              <div className={`stat-value ${run.usdt_difference !== 0 ? 'text-warning' : 'text-success'}`}>
-                {formatUSDT(run.usdt_difference)}
+          {counts ? (
+            <div className="grid grid-2">
+              <div className="stat-card">
+                <div className="stat-value">{counts.total}</div>
+                <div className="stat-label">Всего транзакций</div>
+              </div>
+              <div className="stat-card">
+                <div className="stat-value success">{counts.matched}</div>
+                <div className="stat-label">Сверено</div>
+              </div>
+              <div className="stat-card">
+                <div className="stat-value warning">{counts.missing_in_onlipay}</div>
+                <div className="stat-label">Нет в OnliPay</div>
+              </div>
+              <div className="stat-card">
+                <div className="stat-value warning">{counts.missing_in_gateway}</div>
+                <div className="stat-label">Нет в Gateway</div>
               </div>
             </div>
-            <div>
-              <div className="text-sm text-muted">Разница RUB</div>
-              <div className={`stat-value ${run.rub_difference !== 0 ? 'text-warning' : 'text-success'}`}>
-                {formatCurrency(run.rub_difference)}
-              </div>
-            </div>
+          ) : (
+            <div className="text-sm">Нет данных о транзакциях</div>
+          )}
+        </div>
+      </div>
+
+      {/* Gateway Data */}
+      <div className="card">
+        <div className="card-header">
+          <div className="card-title">Данные Gateway</div>
+        </div>
+        <div className="grid grid-2">
+          <div className="stat-card">
+            <div className="stat-value">{formatCurrency(run.gateway_total_rub)}</div>
+            <div className="stat-label">Gateway Total RUB</div>
+          </div>
+          <div className="stat-card">
+            <div className="stat-value">{formatUSDT(run.gateway_usdt_amount)}</div>
+            <div className="stat-label">Gateway USDT Amount</div>
+          </div>
+          <div className="stat-card">
+            <div className="stat-value">{formatCurrency(run.gateway_sum_wata_base)}</div>
+            <div className="stat-label">WATA Base</div>
+          </div>
+          <div className="stat-card">
+            <div className="stat-value">{formatCurrency(run.gateway_sum_wata_131)}</div>
+            <div className="stat-label">WATA 131</div>
+          </div>
+          <div className="stat-card">
+            <div className="stat-value">{formatCurrency(run.gateway_sum_wata_adult)}</div>
+            <div className="stat-label">WATA Adult</div>
+          </div>
+          <div className="stat-card">
+            <div className="stat-value">{formatCurrency(run.gateway_sum_wata_case)}</div>
+            <div className="stat-label">WATA Case</div>
           </div>
         </div>
       </div>
 
-      {/* Counts */}
-      {counts && (
-        <div className="card">
-          <div className="card-header">
-            <div className="card-title">Количество транзакций</div>
+      {/* Conversion Data */}
+      <div className="card">
+        <div className="card-header">
+          <div className="card-title">Конвертация</div>
+        </div>
+        <div className="grid grid-3">
+          <div className="stat-card">
+            <div className="stat-value">{formatRate(run.fx_rate)}</div>
+            <div className="stat-label">FX Rate</div>
           </div>
-          <div className="grid grid-4">
-            <div className="stat-card">
-              <div className="stat-value">{formatNumber(counts.total)}</div>
-              <div className="stat-label">Всего</div>
-            </div>
-            <div className="stat-card">
-              <div className="stat-value">{formatNumber(counts.matched)}</div>
-              <div className="stat-label">Сверено</div>
-            </div>
-            <div className="stat-card">
-              <div className="stat-value">{formatNumber(counts.missing_in_onlipay)}</div>
-              <div className="stat-label">Нет в OnliPay</div>
-            </div>
-            <div className="stat-card">
-              <div className="stat-value">{formatNumber(counts.missing_in_gateway)}</div>
-              <div className="stat-label">Нет в Gateway</div>
-            </div>
+          <div className="stat-card">
+            <div className="stat-value">{formatRate(run.conversion_commission_rate)}</div>
+            <div className="stat-label">Conversion Commission Rate</div>
+          </div>
+          <div className="stat-card">
+            <div className="stat-value">{formatCurrency(run.conversion_commission_amount)}</div>
+            <div className="stat-label">Conversion Commission Amount</div>
           </div>
         </div>
-      )}
+      </div>
+
+      {/* Differences */}
+      <div className="card">
+        <div className="card-header">
+          <div className="card-title">Разницы</div>
+        </div>
+        <div className="grid grid-2">
+          <div className="stat-card">
+            <div className={`stat-value ${run.usdt_difference !== 0 ? 'warning' : ''}`}>
+              {formatUSDT(run.usdt_difference)}
+            </div>
+            <div className="stat-label">Разница USDT</div>
+          </div>
+          <div className="stat-card">
+            <div className={`stat-value ${run.rub_difference !== 0 ? 'warning' : ''}`}>
+              {formatCurrency(run.rub_difference)}
+            </div>
+            <div className="stat-label">Разница RUB</div>
+          </div>
+        </div>
+      </div>
 
       {/* Reports */}
       <div className="card">
@@ -245,15 +291,15 @@ export default function RunDetailPage() {
         </div>
         <div className="flex gap-4">
           <a
-            href={getReportXlsxUrl(runId)}
+            href={xlsxUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="success"
+            className="primary"
           >
             Скачать Excel отчёт
           </a>
           <a
-            href={getReportTxtUrl(runId)}
+            href={txtUrl}
             target="_blank"
             rel="noopener noreferrer"
             className="secondary"
