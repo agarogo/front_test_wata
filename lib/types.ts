@@ -4,7 +4,12 @@ export interface RunSummary {
   period_start: string;
   period_end: string;
   created_at: string;
+  gateway_usdt_amount: number;
+  calculated_usdt_amount: number;
   usdt_difference: number;
+  gateway_total_rub: number;
+  calculated_total_rub: number;
+  rub_difference: number;
 }
 
 export interface RunDetail {
@@ -22,6 +27,8 @@ export interface RunDetail {
   conversion_commission_amount: number;
   fx_rate: number;
   gateway_usdt_amount: number;
+  calculated_usdt_amount: number;
+  calculated_total_rub: number;
   chargebacks_file?: string;
   usdt_difference: number;
   rub_difference: number;
@@ -30,8 +37,8 @@ export interface RunDetail {
 export interface RunCounts {
   total: number;
   matched: number;
-  missing_in_onlipay: number;
-  missing_in_gateway: number;
+  unmatched_gateway: number;
+  unmatched_onlipay: number;
 }
 
 export interface CommissionGroup {

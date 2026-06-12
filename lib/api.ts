@@ -43,9 +43,9 @@ async function apiFetch<T>(url: string, options?: RequestInit): Promise<T> {
     }
     
     return JSON.parse(text);
-  } catch (err: any) {
+  } catch (err: unknown) {
     clearTimeout(timeoutId);
-    if (err.name === 'AbortError') {
+    if (err instanceof Error && err.name === 'AbortError') {
       throw { message: 'Таймаут запроса (15 сек)', status: 408 };
     }
     throw err;
@@ -56,30 +56,27 @@ export async function getFrontConfig() {
   return apiFetch('/api/v1/front/config');
 }
 
-export async function getRuns(): Promise<any[]> {
-  try {
-    const data = await apiFetch('/api/v1/reconciliation/runs');
-    
-    // Handle various response formats
-    if (!data) return [];
-    if (Array.isArray(data)) return data;
-    if (data.items && Array.isArray(data.items)) return data.items;
-    if (data.runs && Array.isArray(data.runs)) return data.runs;
-    if (data.data && Array.isArray(data.data)) return data.data;
-    
-    return [];
-  } catch (err: any) {
-    // Return empty array on error, let caller handle it
-    return [];
-  }
+export async function getRuns(): Promise<unknown[]> {
+  const data: unknown = await apiFetch('/api/v1/reconciliation/runs');
+  
+  // Handle various response formats
+  if (!data) return [];
+  if (Array.isArray(data)) return data;
+  if (typeof data === 'object' && data !== null && 'items' in data && Array.isArray(data.items)) return data.items;
+  if (typeof data === 'object' && data !== null && 'runs' in data && Array.isArray(data.runs)) return data.runs;
+  if (typeof data === 'object' && data !== null && 'data' in data && Array.isArray(data.data)) return data.data;
+  
+  return [];
 }
 
-export async function getRun(id: string) {
-  return apiFetch(`/api/v1/reconciliation/runs/${id}`);
+export async function getRun(id: string): Promise<unknown> {
+  const result = await apiFetch(`/api/v1/reconciliation/runs/${id}`);
+  return result;
 }
 
-export async function getRunCounts(id: string) {
-  return apiFetch(`/api/v1/reconciliation/runs/${id}/counts`);
+export async function getRunCounts(id: string): Promise<unknown> {
+  const result = await apiFetch(`/api/v1/reconciliation/runs/${id}/counts`);
+  return result;
 }
 
 export async function createRun(formData: FormData) {
@@ -111,9 +108,9 @@ export async function createRun(formData: FormData) {
     }
     
     return response.json();
-  } catch (err: any) {
+  } catch (err: unknown) {
     clearTimeout(timeoutId);
-    if (err.name === 'AbortError') {
+    if (err instanceof Error && err.name === 'AbortError') {
       throw { message: 'Таймаут загрузки файла (30 сек)', status: 408 };
     }
     throw err;
@@ -133,7 +130,13 @@ export async function deleteRun(id: string) {
 }
 
 export async function getCommissionGroups() {
-  return apiFetch('/api/v1/reference/onlipay-groups');
+  const data = await apiFetch('/api/v1/reference/onlipay-groups');
+  
+  // Handle various response formats
+  if (!data) return [];
+  if (Array.isArray(data)) return data;
+  
+  return [];
 }
 
 export async function updateCommissionGroup(group_code: string, data: {

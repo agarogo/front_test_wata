@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useEffect } from 'react';
-import { getRuns, deleteRun } from '../../lib/api';
+import Link from 'next/link';
+import { getRuns } from '../../lib/api';
 import { RunSummary } from '../../lib/types';
 
 function getStatusBadgeClass(status: string): string {
@@ -17,6 +18,11 @@ function getStatusBadgeClass(status: string): string {
     default:
       return '';
   }
+}
+
+function formatCurrency(value: number | string): string {
+  const num = typeof value === 'string' ? parseFloat(value) || 0 : value;
+  return new Intl.NumberFormat('ru-RU', { style: 'currency', currency: 'RUB' }).format(num);
 }
 
 function formatUSDT(value: number): string {
@@ -39,55 +45,30 @@ export default function RunsPage() {
   const [runs, setRuns] = useState<RunSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   useEffect(() => {
     loadRuns();
   }, []);
 
   async function loadRuns() {
+    setLoading(true);
+    setError(null);
     try {
-      setLoading(true);
-      setError(null);
-      const data = await getRuns();
-      setRuns(data || []);
-    } catch (err: any) {
-      setError(err.message || 'Ошибка загрузки запусков');
+      const result = await getRuns().catch(err => {
+        setError(err.message || 'Ошибка загрузки запусков');
+        return null;
+      });
+      setRuns((result as RunSummary[]) || []);
     } finally {
       setLoading(false);
     }
   }
 
-  async function handleDelete(id: string) {
-    if (!confirm('Вы уверены, что хотите удалить этот запуск? Это действие нельзя отменить.')) {
-      return;
-    }
-
-    try {
-      setDeletingId(id);
-      await deleteRun(id);
-      await loadRuns();
-    } catch (err: any) {
-      alert(err.message || 'Ошибка при удалении запуска');
-    } finally {
-      setDeletingId(null);
-    }
-  }
-
-  if (loading) {
-    return (
-      <div className="container">
-        <h1>Запуски сверки</h1>
-        <div className="loading">Загрузка данных...</div>
-      </div>
-    );
-  }
-
   return (
     <div className="container">
-      <div className="flex justify-between items-center mb-6">
+      <div className="page-header">
         <h1>Запуски сверки</h1>
-        <a href="/" className="secondary">← На главную</a>
+        <Link href="/" className="secondary">← На главную</Link>
       </div>
 
       {error && <div className="error mb-4">{error}</div>}
@@ -101,14 +82,23 @@ export default function RunsPage() {
                 <th>Статус</th>
                 <th>Период</th>
                 <th>Создан</th>
+                <th>Gateway USDT</th>
+                <th>Calculated USDT</th>
                 <th>Разница USDT</th>
+                <th>Gateway RUB</th>
+                <th>Calculated RUB</th>
+                <th>Разница RUB</th>
                 <th>Действия</th>
               </tr>
             </thead>
             <tbody>
-              {runs.length === 0 ? (
+              {loading ? (
                 <tr>
-                  <td colSpan={6} className="empty-state">Нет запусков сверки</td>
+                  <td colSpan={11} className="empty-state">Загрузка запусков...</td>
+                </tr>
+              ) : runs.length === 0 ? (
+                <tr>
+                  <td colSpan={11} className="empty-state">Пока нет запусков сверки</td>
                 </tr>
               ) : (
                 runs.map((run) => (
@@ -123,22 +113,20 @@ export default function RunsPage() {
                       {run.period_start} — {run.period_end}
                     </td>
                     <td className="text-sm">{formatDate(run.created_at)}</td>
+                    <td>{formatUSDT(run.gateway_usdt_amount)}</td>
+                    <td>{formatUSDT(run.calculated_usdt_amount)}</td>
                     <td className={run.usdt_difference !== 0 ? 'text-warning' : ''}>
                       {formatUSDT(run.usdt_difference)}
                     </td>
+                    <td>{formatCurrency(run.gateway_total_rub)}</td>
+                    <td>{formatCurrency(run.calculated_total_rub)}</td>
+                    <td className={run.rub_difference !== 0 ? 'text-warning' : ''}>
+                      {formatCurrency(run.rub_difference)}
+                    </td>
                     <td>
-                      <div className="flex gap-2">
-                        <a href={`/runs/${run.id}`} className="text-sm">
-                          Подробнее →
-                        </a>
-                        <button
-                          className="danger text-sm"
-                          onClick={() => handleDelete(run.id)}
-                          disabled={deletingId === run.id}
-                        >
-                          {deletingId === run.id ? 'Удаление...' : 'Удалить'}
-                        </button>
-                      </div>
+                      <Link href={`/runs/${run.id}`} className="text-sm">
+                        Подробнее →
+                      </Link>
                     </td>
                   </tr>
                 ))
@@ -146,6 +134,20 @@ export default function RunsPage() {
             </tbody>
           </table>
         </div>
+      </div>
+
+      <div className="card">
+        <button onClick={loadRuns} className="secondary">
+          Повторить загрузку
+        </button>
+      </div>
+
+      <div className="card" style={{ fontSize: '0.75rem', fontFamily: 'monospace' }}>
+        <div className="card-title">Debug Info</div>
+        <div>API: http://10.129.0.9:8055</div>
+        <div>Hydrated: yes</div>
+        <div>Runs: {runs.length} items</div>
+        <div>Loading: {loading ? 'yes' : 'no'}</div>
       </div>
     </div>
   );

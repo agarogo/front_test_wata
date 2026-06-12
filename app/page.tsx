@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from 'react';
+import Link from 'next/link';
 import { getRuns, createRun, getCommissionGroups } from '../lib/api';
 import { RunSummary, CommissionGroup } from '../lib/types';
 
@@ -48,7 +49,8 @@ function formatRate(value: string | number): string {
 export default function Home() {
   const [runs, setRuns] = useState<RunSummary[]>([]);
   const [commissionGroups, setCommissionGroups] = useState<CommissionGroup[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [runsLoading, setRunsLoading] = useState(true);
+  const [groupsLoading, setGroupsLoading] = useState(true);
   const [runsError, setRunsError] = useState<string | null>(null);
   const [groupsError, setGroupsError] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
@@ -76,37 +78,29 @@ export default function Home() {
   }, []);
 
   async function loadData() {
-    setLoading(true);
+    setRunsLoading(true);
+    setGroupsLoading(true);
     setRunsError(null);
     setGroupsError(null);
     
     try {
-      const results = await Promise.allSettled([
-        getRuns(),
-        getCommissionGroups()
-      ]);
-
-      // Handle runs result
-      const runsResult = results[0];
-      if (runsResult.status === 'fulfilled') {
-        setRuns(runsResult.value || []);
-      } else {
-        setRunsError(runsResult.reason?.message || 'Ошибка загрузки запусков');
-        setRuns([]);
-      }
-
-      // Handle commission groups result
-      const groupsResult = results[1];
-      if (groupsResult.status === 'fulfilled') {
-        setCommissionGroups(groupsResult.value || []);
-      } else {
-        setGroupsError(groupsResult.reason?.message || 'Ошибка загрузки ставок');
-        setCommissionGroups([]);
-      }
-    } catch (err: any) {
-      console.error('Unexpected error in loadData:', err);
+      const runsResult = await getRuns().catch(err => {
+        setRunsError(err.message || 'Ошибка загрузки запусков');
+        return null;
+      });
+      setRuns((runsResult as RunSummary[]) || []);
     } finally {
-      setLoading(false);
+      setRunsLoading(false);
+    }
+
+    try {
+      const groupsResult = await getCommissionGroups().catch(err => {
+        setGroupsError(err.message || 'Ошибка загрузки ставок');
+        return null;
+      });
+      setCommissionGroups(groupsResult || []);
+    } finally {
+      setGroupsLoading(false);
     }
   }
 
@@ -185,19 +179,12 @@ export default function Home() {
       
       // Обновить список запусков
       await loadData();
-    } catch (err: any) {
-      setUploadError(err.message || 'Ошибка при создании запуска');
+    } catch (err: unknown) {
+      const error = err as { message?: string };
+      setUploadError(error.message || 'Ошибка при создании запуска');
     } finally {
       setUploading(false);
     }
-  }
-
-  if (loading) {
-    return (
-      <div className="container">
-        <div className="loading">Загрузка данных...</div>
-      </div>
-    );
   }
 
   return (
@@ -389,7 +376,11 @@ export default function Home() {
                 </tr>
               </thead>
               <tbody>
-                {commissionGroups.length === 0 ? (
+                {groupsLoading ? (
+                  <tr>
+                    <td colSpan={5} className="empty-state">Загрузка ставок...</td>
+                  </tr>
+                ) : commissionGroups.length === 0 ? (
                   <tr>
                     <td colSpan={5} className="empty-state">Нет данных о ставках</td>
                   </tr>
@@ -407,9 +398,9 @@ export default function Home() {
               </tbody>
             </table>
           </div>
-          <a href="/settings/commissions" className="text-sm">
+          <Link href="/settings/commissions" className="text-sm">
             Настроить ставки →
-          </a>
+          </Link>
         </div>
       </div>
 
@@ -459,7 +450,11 @@ export default function Home() {
               </tr>
             </thead>
             <tbody>
-              {runs.length === 0 ? (
+              {runsLoading ? (
+                <tr>
+                  <td colSpan={6} className="empty-state">Загрузка запусков...</td>
+                </tr>
+              ) : runs.length === 0 ? (
                 <tr>
                   <td colSpan={6} className="empty-state">Пока нет запусков сверки</td>
                 </tr>
@@ -491,10 +486,28 @@ export default function Home() {
           </table>
         </div>
         {runs.length > 0 && (
-          <a href="/runs" className="text-sm">
+          <Link href="/runs" className="text-sm">
             Показать все запуски →
-          </a>
+          </Link>
         )}
+      </div>
+
+      {/* Retry Button */}
+      <div className="card">
+        <button onClick={loadData} className="secondary">
+          Повторить загрузку
+        </button>
+      </div>
+
+      {/* Debug Block */}
+      <div className="card" style={{ fontSize: '0.75rem', fontFamily: 'monospace' }}>
+        <div className="card-title">Debug Info</div>
+        <div>API: http://10.129.0.9:8055</div>
+        <div>Hydrated: yes</div>
+        <div>Runs: {runs.length} items</div>
+        <div>Groups: {commissionGroups.length} items</div>
+        <div>Runs Loading: {runsLoading ? 'yes' : 'no'}</div>
+        <div>Groups Loading: {groupsLoading ? 'yes' : 'no'}</div>
       </div>
     </div>
   );

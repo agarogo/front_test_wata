@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, useEffect } from 'react';
-import { useParams } from 'next/navigation';
-import { getRun, getRunCounts, acceptRun, getReportXlsxUrl, getReportTxtUrl } from '../../../lib/api';
+import { useState, useEffect, useCallback } from 'react';
+import { useParams, useRouter } from 'next/navigation';
+import Link from 'next/link';
+import { getRun, getRunCounts, acceptRun, deleteRun, getReportXlsxUrl, getReportTxtUrl } from '../../../lib/api';
 import { RunDetail, RunCounts } from '../../../lib/types';
 
 function getStatusBadgeClass(status: string): string {
@@ -20,8 +21,9 @@ function getStatusBadgeClass(status: string): string {
   }
 }
 
-function formatCurrency(value: number): string {
-  return new Intl.NumberFormat('ru-RU', { style: 'currency', currency: 'RUB' }).format(value);
+function formatCurrency(value: number | string): string {
+  const num = typeof value === 'string' ? parseFloat(value) || 0 : value;
+  return new Intl.NumberFormat('ru-RU', { style: 'currency', currency: 'RUB' }).format(num);
 }
 
 function formatUSDT(value: number): string {
@@ -40,127 +42,111 @@ function formatDate(dateStr: string): string {
   });
 }
 
-function formatRate(value: number): string {
-  return (value * 100).toFixed(2) + '%';
-}
-
 export default function RunDetailPage() {
   const params = useParams();
-  const id = Array.isArray(params.id) ? params.id[0] : params.id;
+  const router = useRouter();
+  const runId = params.id as string;
 
   const [run, setRun] = useState<RunDetail | null>(null);
   const [counts, setCounts] = useState<RunCounts | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [accepting, setAccepting] = useState(false);
+  const [actionLoading, setActionLoading] = useState(false);
 
-  useEffect(() => {
-    if (!id) {
-      setError('ID запуска не указан');
-      setLoading(false);
-      return;
-    }
-    loadData();
-  }, [id]);
-
-  async function loadData() {
+  const loadRun = useCallback(async () => {
+    setLoading(true);
+    setError(null);
     try {
-      setLoading(true);
-      setError(null);
-      
-      const [runData, countsData] = await Promise.allSettled([
-        getRun(id),
-        getRunCounts(id)
+      const [runResult, countsResult] = await Promise.all([
+        getRun(runId).catch(err => {
+          setError(err.message || 'Ошибка загрузки запуска');
+          return null;
+        }),
+        getRunCounts(runId).catch(() => null)
       ]);
-
-      if (runData.status === 'fulfilled') {
-        setRun(runData.value || null);
-      } else {
-        setError(runData.reason?.message || 'Ошибка загрузки данных запуска');
-      }
-
-      if (countsData.status === 'fulfilled') {
-        setCounts(countsData.value || null);
-      }
-    } catch (err: any) {
-      setError(err.message || 'Ошибка загрузки данных');
+      setRun((runResult as RunDetail) || null);
+      setCounts((countsResult as RunCounts) || null);
     } finally {
       setLoading(false);
+    }
+  }, [runId]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      loadRun();
+    }, 0);
+    return () => clearTimeout(timer);
+  }, [loadRun]);
+
+  async function handleAccept() {
+    if (!run) return;
+    
+    if (!confirm(`Подтвердить запуск ${run.id.slice(0, 8)}...?`)) {
+      return;
+    }
+
+    setActionLoading(true);
+    try {
+      await acceptRun(runId);
+      await loadRun();
+    } catch (err: unknown) {
+      const error = err as { message?: string };
+      alert(error.message || 'Ошибка при подтверждении');
+    } finally {
+      setActionLoading(false);
     }
   }
 
-  async function handleAccept() {
-    if (!confirm('Подтвердить этот запуск сверки?')) {
+  async function handleDelete() {
+    if (!run) return;
+    
+    if (!confirm(`Удалить запуск ${run.id.slice(0, 8)}...? Это действие нельзя отменить.`)) {
       return;
     }
 
+    setActionLoading(true);
     try {
-      setAccepting(true);
-      await acceptRun(id);
-      await loadData();
-      alert('Запуск успешно подтверждён');
-    } catch (err: any) {
-      alert(err.message || 'Ошибка при подтверждении запуска');
+      await deleteRun(runId);
+      router.push('/runs');
+    } catch (err: unknown) {
+      const error = err as { message?: string };
+      alert(error.message || 'Ошибка при удалении');
     } finally {
-      setAccepting(false);
+      setActionLoading(false);
     }
   }
 
   if (loading) {
     return (
       <div className="container">
-        <h1>Детали запуска</h1>
-        <div className="loading">Загрузка данных...</div>
+        <div className="empty-state">Загрузка данных запуска...</div>
       </div>
     );
   }
 
-  if (error && !run) {
+  if (error || !run) {
     return (
       <div className="container">
-        <div className="flex justify-between items-center mb-6">
-          <h1>Детали запуска</h1>
-          <a href="/runs" className="secondary">← К списку</a>
+        <div className="page-header">
+          <h1>Запуск не найден</h1>
+          <Link href="/runs" className="secondary">← К списку запусков</Link>
         </div>
-        <div className="error">{error}</div>
+        {error && <div className="error mb-4">{error}</div>}
+        <div className="card">
+          <button onClick={loadRun} className="secondary">
+            Повторить загрузку
+          </button>
+        </div>
       </div>
     );
   }
-
-  if (!run) {
-    return (
-      <div className="container">
-        <div className="flex justify-between items-center mb-6">
-          <h1>Детали запуска</h1>
-          <a href="/runs" className="secondary">← К списку</a>
-        </div>
-        <div className="empty-state">Запуск не найден</div>
-      </div>
-    );
-  }
-
-  const xlsxUrl = getReportXlsxUrl(id);
-  const txtUrl = getReportTxtUrl(id);
 
   return (
     <div className="container">
-      <div className="flex justify-between items-center mb-6">
-        <h1>Запуск сверки: {id.slice(0, 8)}...</h1>
-        <div className="flex gap-2">
-          <a href="/runs" className="secondary">← К списку</a>
-          {run.status === 'completed' && (
-            <button
-              className="primary"
-              onClick={handleAccept}
-              disabled={accepting || run.status === 'accepted'}
-            >
-              {accepting ? 'Подтверждение...' : run.status === 'accepted' ? 'Подтверждено' : 'Подтвердить'}
-            </button>
-          )}
-        </div>
+      <div className="page-header">
+        <h1>Запуск сверки: {run.id.slice(0, 8)}...</h1>
+        <Link href="/runs" className="secondary">← К списку запусков</Link>
       </div>
-
-      {error && <div className="error mb-4">{error}</div>}
 
       <div className="grid grid-2">
         {/* Status Card */}
@@ -168,115 +154,53 @@ export default function RunDetailPage() {
           <div className="card-header">
             <div className="card-title">Статус</div>
           </div>
-          <div className="stat-card large">
+          <div className="stat-card" style={{ textAlign: 'center' }}>
             <span className={`badge ${getStatusBadgeClass(run.status)}`}>
               {run.status}
             </span>
-          </div>
-          <div className="text-sm mt-4">
-            <div>Период: {run.period_start} — {run.period_end}</div>
-            <div>Создан: {formatDate(run.created_at)}</div>
+            <div className="stat-label" style={{ marginTop: '0.5rem' }}>
+              {run.status === 'processing' && 'В обработке...'}
+              {run.status === 'completed' && 'Обработка завершена'}
+              {run.status === 'failed' && 'Ошибка обработки'}
+              {run.status === 'accepted' && 'Подтверждено'}
+            </div>
           </div>
         </div>
 
-        {/* Counts Card */}
+        {/* Period Card */}
         <div className="card">
           <div className="card-header">
-            <div className="card-title">Сводка транзакций</div>
+            <div className="card-title">Период</div>
           </div>
-          {counts ? (
-            <div className="grid grid-2">
-              <div className="stat-card">
-                <div className="stat-value">{counts.total}</div>
-                <div className="stat-label">Всего транзакций</div>
-              </div>
-              <div className="stat-card">
-                <div className="stat-value success">{counts.matched}</div>
-                <div className="stat-label">Сверено</div>
-              </div>
-              <div className="stat-card">
-                <div className="stat-value warning">{counts.missing_in_onlipay}</div>
-                <div className="stat-label">Нет в OnliPay</div>
-              </div>
-              <div className="stat-card">
-                <div className="stat-value warning">{counts.missing_in_gateway}</div>
-                <div className="stat-label">Нет в Gateway</div>
-              </div>
-            </div>
-          ) : (
-            <div className="text-sm">Нет данных о транзакциях</div>
-          )}
+          <div className="stat-card">
+            <div className="stat-value">{run.period_start} — {run.period_end}</div>
+            <div className="stat-label">Создан: {formatDate(run.created_at)}</div>
+          </div>
         </div>
       </div>
 
-      {/* Gateway Data */}
+      {/* Summary Stats */}
       <div className="card">
         <div className="card-header">
-          <div className="card-title">Данные Gateway</div>
+          <div className="card-title">Итоги сверки</div>
         </div>
-        <div className="grid grid-2">
-          <div className="stat-card">
-            <div className="stat-value">{formatCurrency(run.gateway_total_rub)}</div>
-            <div className="stat-label">Gateway Total RUB</div>
-          </div>
+        <div className="grid grid-4">
           <div className="stat-card">
             <div className="stat-value">{formatUSDT(run.gateway_usdt_amount)}</div>
-            <div className="stat-label">Gateway USDT Amount</div>
+            <div className="stat-label">Gateway USDT</div>
           </div>
           <div className="stat-card">
-            <div className="stat-value">{formatCurrency(run.gateway_sum_wata_base)}</div>
-            <div className="stat-label">WATA Base</div>
+            <div className="stat-value">{formatUSDT(run.calculated_usdt_amount)}</div>
+            <div className="stat-label">Calculated USDT</div>
           </div>
           <div className="stat-card">
-            <div className="stat-value">{formatCurrency(run.gateway_sum_wata_131)}</div>
-            <div className="stat-label">WATA 131</div>
-          </div>
-          <div className="stat-card">
-            <div className="stat-value">{formatCurrency(run.gateway_sum_wata_adult)}</div>
-            <div className="stat-label">WATA Adult</div>
-          </div>
-          <div className="stat-card">
-            <div className="stat-value">{formatCurrency(run.gateway_sum_wata_case)}</div>
-            <div className="stat-label">WATA Case</div>
-          </div>
-        </div>
-      </div>
-
-      {/* Conversion Data */}
-      <div className="card">
-        <div className="card-header">
-          <div className="card-title">Конвертация</div>
-        </div>
-        <div className="grid grid-3">
-          <div className="stat-card">
-            <div className="stat-value">{formatRate(run.fx_rate)}</div>
-            <div className="stat-label">FX Rate</div>
-          </div>
-          <div className="stat-card">
-            <div className="stat-value">{formatRate(run.conversion_commission_rate)}</div>
-            <div className="stat-label">Conversion Commission Rate</div>
-          </div>
-          <div className="stat-card">
-            <div className="stat-value">{formatCurrency(run.conversion_commission_amount)}</div>
-            <div className="stat-label">Conversion Commission Amount</div>
-          </div>
-        </div>
-      </div>
-
-      {/* Differences */}
-      <div className="card">
-        <div className="card-header">
-          <div className="card-title">Разницы</div>
-        </div>
-        <div className="grid grid-2">
-          <div className="stat-card">
-            <div className={`stat-value ${run.usdt_difference !== 0 ? 'warning' : ''}`}>
+            <div className={`stat-value ${run.usdt_difference !== 0 ? 'text-warning' : ''}`}>
               {formatUSDT(run.usdt_difference)}
             </div>
             <div className="stat-label">Разница USDT</div>
           </div>
           <div className="stat-card">
-            <div className={`stat-value ${run.rub_difference !== 0 ? 'warning' : ''}`}>
+            <div className={`stat-value ${run.rub_difference !== 0 ? 'text-warning' : ''}`}>
               {formatCurrency(run.rub_difference)}
             </div>
             <div className="stat-label">Разница RUB</div>
@@ -284,29 +208,72 @@ export default function RunDetailPage() {
         </div>
       </div>
 
-      {/* Reports */}
+      {/* Counts */}
+      {counts && (
+        <div className="card">
+          <div className="card-header">
+            <div className="card-title">Количество записей</div>
+          </div>
+          <div className="grid grid-4">
+            <div className="stat-card">
+              <div className="stat-value">{counts.total}</div>
+              <div className="stat-label">Всего</div>
+            </div>
+            <div className="stat-card">
+              <div className="stat-value">{counts.matched}</div>
+              <div className="stat-label">Сверено</div>
+            </div>
+            <div className="stat-card">
+              <div className="stat-value">{counts.unmatched_gateway}</div>
+              <div className="stat-label">Без пары (Gateway)</div>
+            </div>
+            <div className="stat-card">
+              <div className="stat-value">{counts.unmatched_onlipay}</div>
+              <div className="stat-label">Без пары (OnliPay)</div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Actions */}
       <div className="card">
         <div className="card-header">
-          <div className="card-title">Отчёты</div>
+          <div className="card-title">Действия</div>
         </div>
-        <div className="flex gap-4">
-          <a
-            href={xlsxUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="primary"
-          >
-            Скачать Excel отчёт
+        <div className="actions">
+          {run.status === 'completed' && (
+            <button onClick={handleAccept} disabled={actionLoading} className="primary">
+              {actionLoading ? 'Обработка...' : 'Подтвердить'}
+            </button>
+          )}
+          {run.status !== 'accepted' && (
+            <button onClick={handleDelete} disabled={actionLoading} className="danger">
+              {actionLoading ? 'Обработка...' : 'Удалить'}
+            </button>
+          )}
+          <a href={getReportXlsxUrl(run.id)} className="secondary" download>
+            Скачать Excel
           </a>
-          <a
-            href={txtUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="secondary"
-          >
-            Скачать TXT отчёт
+          <a href={getReportTxtUrl(run.id)} className="secondary" download>
+            Скачать TXT
           </a>
         </div>
+      </div>
+
+      {/* Retry Button */}
+      <div className="card">
+        <button onClick={loadRun} className="secondary">
+          Повторить загрузку
+        </button>
+      </div>
+
+      {/* Debug Block */}
+      <div className="card" style={{ fontSize: '0.75rem', fontFamily: 'monospace' }}>
+        <div className="card-title">Debug Info</div>
+        <div>API: http://10.129.0.9:8055</div>
+        <div>Hydrated: yes</div>
+        <div>Run ID: {run.id}</div>
+        <div>Status: {run.status}</div>
       </div>
     </div>
   );

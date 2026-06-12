@@ -1,78 +1,72 @@
 "use client";
 
 import { useState, useEffect } from 'react';
+import Link from 'next/link';
 import { getCommissionGroups, updateCommissionGroup, resetCommissionGroups } from '../../../lib/api';
 import { CommissionGroup } from '../../../lib/types';
+
+function formatCurrency(value: number | string): string {
+  const num = typeof value === 'string' ? parseFloat(value) || 0 : value;
+  return new Intl.NumberFormat('ru-RU', { style: 'currency', currency: 'RUB' }).format(num);
+}
 
 function formatRate(value: string | number): string {
   const num = typeof value === 'string' ? parseFloat(value) || 0 : value;
   return (num * 100).toFixed(2) + '%';
 }
 
-function formatCurrency(value: string | number): string {
-  const num = typeof value === 'string' ? parseFloat(value) || 0 : value;
-  return new Intl.NumberFormat('ru-RU', { style: 'currency', currency: 'RUB' }).format(num);
-}
-
-function formatDate(dateStr: string | null | undefined): string {
-  if (!dateStr) return '-';
-  const date = new Date(dateStr);
-  return date.toLocaleDateString('ru-RU', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit'
-  });
-}
-
 export default function CommissionsPage() {
   const [groups, setGroups] = useState<CommissionGroup[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [savingId, setSavingId] = useState<string | null>(null);
-  const [resetting, setResetting] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [success, setSuccess] = useState<string | null>(null);
 
-  const [editData, setEditData] = useState<Record<string, Partial<CommissionGroup>>>({});
+  const [editForm, setEditForm] = useState<Record<string, {
+    commission_rate: string;
+    min_commission: string;
+    fixed_commission: string;
+  }>>({});
 
   useEffect(() => {
     loadGroups();
   }, []);
 
   async function loadGroups() {
+    setLoading(true);
+    setError(null);
     try {
-      setLoading(true);
-      setError(null);
-      const data = await getCommissionGroups();
-      setGroups(data || []);
-    } catch (err: any) {
-      setError(err.message || 'Ошибка загрузки ставок');
+      const result = await getCommissionGroups().catch(err => {
+        setError(err.message || 'Ошибка загрузки ставок');
+        return null;
+      });
+      setGroups(result || []);
     } finally {
       setLoading(false);
     }
   }
 
-  function handleEdit(group_code: string) {
-    setEditData(prev => ({
+  function startEdit(group_code: string, group: CommissionGroup) {
+    setEditForm(prev => ({
       ...prev,
-      [group_code]: groups.find(g => g.group_code === group_code) || {}
+      [group_code]: {
+        commission_rate: String(group.commission_rate),
+        min_commission: String(group.min_commission),
+        fixed_commission: String(group.fixed_commission)
+      }
     }));
   }
 
-  function handleCancel(group_code: string) {
-    setEditData(prev => {
+  function cancelEdit(group_code: string) {
+    setEditForm(prev => {
       const next = { ...prev };
       delete next[group_code];
       return next;
     });
   }
 
-  function handleInputChange(
-    group_code: string,
-    field: keyof CommissionGroup,
-    value: string
-  ) {
-    setEditData(prev => ({
+  function updateEditForm(group_code: string, field: string, value: string) {
+    setEditForm(prev => ({
       ...prev,
       [group_code]: {
         ...prev[group_code],
@@ -81,36 +75,30 @@ export default function CommissionsPage() {
     }));
   }
 
-  async function handleSave(group_code: string) {
-    const data = editData[group_code];
-    if (!data) return;
+  async function saveEdit(group_code: string) {
+    const form = editForm[group_code];
+    if (!form) return;
 
-    const commission_rate = data.commission_rate || '';
-    const min_commission = data.min_commission || '';
-    const fixed_commission = data.fixed_commission || '';
-
-    if (!commission_rate || !min_commission || !fixed_commission) {
-      alert('Заполните все поля');
-      return;
-    }
-
+    setSaving(true);
+    setSuccess(null);
     try {
-      setSavingId(group_code);
       await updateCommissionGroup(group_code, {
-        commission_rate,
-        min_commission,
-        fixed_commission
+        commission_rate: form.commission_rate,
+        min_commission: form.min_commission,
+        fixed_commission: form.fixed_commission
       });
-      await loadGroups();
-      setEditData(prev => {
+      setSuccess('Ставка обновлена');
+      setEditForm(prev => {
         const next = { ...prev };
         delete next[group_code];
         return next;
       });
-    } catch (err: any) {
-      alert(err.message || 'Ошибка при сохранении');
+      await loadGroups();
+    } catch (err: unknown) {
+      const error = err as { message?: string };
+      setError(error.message || 'Ошибка при сохранении');
     } finally {
-      setSavingId(null);
+      setSaving(false);
     }
   }
 
@@ -119,47 +107,29 @@ export default function CommissionsPage() {
       return;
     }
 
+    setSaving(true);
+    setSuccess(null);
     try {
-      setResetting(true);
       await resetCommissionGroups();
+      setSuccess('Ставки сброшены к значениям по умолчанию');
       await loadGroups();
-      alert('Ставки успешно сброшены');
-    } catch (err: any) {
-      alert(err.message || 'Ошибка при сбросе ставок');
+    } catch (err: unknown) {
+      const error = err as { message?: string };
+      setError(error.message || 'Ошибка при сбросе');
     } finally {
-      setResetting(false);
+      setSaving(false);
     }
-  }
-
-  if (loading) {
-    return (
-      <div className="container">
-        <div className="flex justify-between items-center mb-6">
-          <h1>Настройка ставок комиссий</h1>
-          <a href="/" className="secondary">← На главную</a>
-        </div>
-        <div className="loading">Загрузка данных...</div>
-      </div>
-    );
   }
 
   return (
     <div className="container">
-      <div className="flex justify-between items-center mb-6">
+      <div className="page-header">
         <h1>Настройка ставок комиссий OnliPay</h1>
-        <div className="flex gap-2">
-          <a href="/" className="secondary">← На главную</a>
-          <button
-            className="danger"
-            onClick={handleReset}
-            disabled={resetting}
-          >
-            {resetting ? 'Сброс...' : 'Сбросить все'}
-          </button>
-        </div>
+        <Link href="/" className="secondary">← На главную</Link>
       </div>
 
       {error && <div className="error mb-4">{error}</div>}
+      {success && <div className="success mb-4" style={{ color: 'var(--success)' }}>{success}</div>}
 
       <div className="card">
         <div className="table-container">
@@ -168,89 +138,79 @@ export default function CommissionsPage() {
               <tr>
                 <th>Группа</th>
                 <th>Gateway Point</th>
-                <th>Ставка комиссии</th>
-                <th>Мин. комиссия</th>
-                <th>Фикс. комиссия</th>
-                <th>Обновлено</th>
+                <th>Ставка (%)</th>
+                <th>Мин. комиссия (RUB)</th>
+                <th>Фикс. комиссия (RUB)</th>
                 <th>Действия</th>
               </tr>
             </thead>
             <tbody>
-              {groups.length === 0 ? (
+              {loading ? (
                 <tr>
-                  <td colSpan={7} className="empty-state">Нет данных о ставках</td>
+                  <td colSpan={6} className="empty-state">Загрузка ставок...</td>
+                </tr>
+              ) : groups.length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="empty-state">Нет данных о ставках</td>
                 </tr>
               ) : (
                 groups.map((group) => {
-                  const isEditing = editData[group.group_code] !== undefined;
-                  const edit = editData[group.group_code] || group;
-
+                  const editing = editForm[group.group_code];
                   return (
                     <tr key={group.group_code}>
-                      <td className="font-medium">{group.label || group.group_code}</td>
+                      <td>{group.label || group.group_code}</td>
                       <td className="text-sm">{group.gateway_point}</td>
                       <td>
-                        {isEditing ? (
+                        {editing ? (
                           <input
                             type="number"
-                            value={edit.commission_rate || ''}
-                            onChange={(e) => handleInputChange(group.group_code, 'commission_rate', e.target.value)}
                             step="0.0001"
-                            className="input"
+                            value={editing.commission_rate}
+                            onChange={(e) => updateEditForm(group.group_code, 'commission_rate', e.target.value)}
+                            style={{ width: '100px' }}
                           />
                         ) : (
                           formatRate(group.commission_rate)
                         )}
                       </td>
                       <td>
-                        {isEditing ? (
+                        {editing ? (
                           <input
                             type="number"
-                            value={edit.min_commission || ''}
-                            onChange={(e) => handleInputChange(group.group_code, 'min_commission', e.target.value)}
                             step="0.01"
-                            className="input"
+                            value={editing.min_commission}
+                            onChange={(e) => updateEditForm(group.group_code, 'min_commission', e.target.value)}
+                            style={{ width: '100px' }}
                           />
                         ) : (
                           formatCurrency(group.min_commission)
                         )}
                       </td>
                       <td>
-                        {isEditing ? (
+                        {editing ? (
                           <input
                             type="number"
-                            value={edit.fixed_commission || ''}
-                            onChange={(e) => handleInputChange(group.group_code, 'fixed_commission', e.target.value)}
                             step="0.01"
-                            className="input"
+                            value={editing.fixed_commission}
+                            onChange={(e) => updateEditForm(group.group_code, 'fixed_commission', e.target.value)}
+                            style={{ width: '100px' }}
                           />
                         ) : (
                           formatCurrency(group.fixed_commission)
                         )}
                       </td>
-                      <td className="text-sm">{formatDate(group.updated_at)}</td>
                       <td>
-                        {isEditing ? (
-                          <div className="flex gap-2">
-                            <button
-                              className="primary text-sm"
-                              onClick={() => handleSave(group.group_code)}
-                              disabled={savingId === group.group_code}
-                            >
-                              {savingId === group.group_code ? 'Сохранение...' : 'Сохранить'}
+                        {editing ? (
+                          <div className="actions">
+                            <button onClick={() => saveEdit(group.group_code)} disabled={saving} className="primary">
+                              {saving ? 'Сохранение...' : 'Сохранить'}
                             </button>
-                            <button
-                              className="secondary text-sm"
-                              onClick={() => handleCancel(group.group_code)}
-                            >
+                            <button onClick={() => cancelEdit(group.group_code)} className="secondary">
                               Отмена
                             </button>
                           </div>
                         ) : (
-                          <button
-                            className="text-sm"
-                            onClick={() => handleEdit(group.group_code)}
-                          >
+                          <button onClick={() => startEdit(group.group_code, group)} className="secondary">
                             Редактировать
                           </button>
                         )}
@@ -262,6 +222,26 @@ export default function CommissionsPage() {
             </tbody>
           </table>
         </div>
+      </div>
+
+      <div className="card">
+        <button onClick={handleReset} disabled={saving} className="danger">
+          {saving ? 'Обработка...' : 'Сбросить к значениям по умолчанию'}
+        </button>
+      </div>
+
+      <div className="card">
+        <button onClick={loadGroups} className="secondary">
+          Повторить загрузку
+        </button>
+      </div>
+
+      <div className="card" style={{ fontSize: '0.75rem', fontFamily: 'monospace' }}>
+        <div className="card-title">Debug Info</div>
+        <div>API: http://10.129.0.9:8055</div>
+        <div>Hydrated: yes</div>
+        <div>Groups: {groups.length} items</div>
+        <div>Loading: {loading ? 'yes' : 'no'}</div>
       </div>
     </div>
   );
