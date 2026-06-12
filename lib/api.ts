@@ -1,61 +1,102 @@
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://10.129.0.9:8055';
+
+interface ApiError {
+  message: string;
+  status?: number;
+}
+
+async function apiFetch<T>(url: string, options?: RequestInit): Promise<T> {
+  const fullUrl = `${API_BASE_URL}${url}`;
+  
+  const response = await fetch(fullUrl, options);
+  
+  if (!response.ok) {
+    let error: ApiError;
+    try {
+      const json = await response.json();
+      error = { message: json.message || 'Ошибка сервера', status: response.status };
+    } catch {
+      error = { message: `HTTP ${response.status}: ${response.statusText}`, status: response.status };
+    }
+    throw error;
+  }
+  
+  return response.json();
+}
+
 export async function getFrontConfig() {
-  return fetch('/api/v1/front/config').then(res => res.json())
+  return apiFetch('/api/v1/front/config');
 }
 
 export async function getRuns() {
-  return fetch('/api/v1/reconciliation/runs').then(res => res.json())
+  return apiFetch('/api/v1/reconciliation/runs');
 }
 
 export async function getRun(id: string) {
-  return fetch(`/api/v1/reconciliation/runs/${id}`).then(res => res.json())
+  return apiFetch(`/api/v1/reconciliation/runs/${id}`);
 }
 
 export async function getRunCounts(id: string) {
-  return fetch(`/api/v1/reconciliation/runs/${id}/counts`).then(res => res.json())
+  return apiFetch(`/api/v1/reconciliation/runs/${id}/counts`);
 }
 
-export async function createRun(data: any) {
-  return fetch('/api/v1/reconciliation/runs', {
+export async function createRun(formData: FormData) {
+  return fetch(`${API_BASE_URL}/api/v1/reconciliation/runs`, {
     method: 'POST',
-    headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify(data)
-  }).then(res => res.json())
+    body: formData
+  }).then(async (res) => {
+    if (!res.ok) {
+      let error: ApiError;
+      try {
+        const json = await res.json();
+        error = { message: json.message || 'Ошибка сервера', status: res.status };
+      } catch {
+        error = { message: `HTTP ${res.status}: ${res.statusText}`, status: res.status };
+      }
+      throw error;
+    }
+    return res.json();
+  });
 }
 
 export async function acceptRun(id: string) {
-  return fetch(`/api/v1/reconciliation/runs/${id}/accept`, {
+  return apiFetch(`/api/v1/reconciliation/runs/${id}/accept`, {
     method: 'POST'
-  }).then(res => res.json())
+  });
 }
 
 export async function deleteRun(id: string) {
-  return fetch(`/api/v1/reconciliation/runs/${id}`, {
+  return apiFetch(`/api/v1/reconciliation/runs/${id}`, {
     method: 'DELETE'
-  }).then(res => res.json())
+  });
 }
 
 export async function getCommissionGroups() {
-  return fetch('/api/v1/reference/onlipay-groups').then(res => res.json())
+  return apiFetch('/api/v1/reference/onlipay-groups');
 }
 
-export async function updateCommissionGroup(id: string, data: any) {
-  return fetch(`/api/v1/reference/onlipay-groups/${id}`, {
+export async function updateCommissionGroup(group: { group_code: string; rate: number; min_commission: number; fixed_commission: number }) {
+  return apiFetch(`/api/v1/reference/onlipay-groups/${group.group_code}`, {
     method: 'PUT',
-    headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify(data)
-  }).then(res => res.json())
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      rate: group.rate,
+      min_commission: group.min_commission,
+      fixed_commission: group.fixed_commission
+    })
+  });
 }
 
 export async function resetCommissionGroups() {
-  return fetch('/api/v1/reference/onlipay-groups/reset', {
+  return apiFetch('/api/v1/reference/onlipay-groups/reset-defaults', {
     method: 'POST'
-  }).then(res => res.json())
+  });
 }
 
-export async function getReportXlsxUrl(id: string) {
-  return fetch(`/api/v1/reconciliation/runs/${id}/report.xlsx`).then(res => res.json())
+export function getReportXlsxUrl(id: string): string {
+  return `${API_BASE_URL}/api/v1/reconciliation/runs/${id}/report.xlsx`;
 }
 
-export async function getReportTxtUrl(id: string) {
-  return fetch(`/api/v1/reconciliation/runs/${id}/report.txt`).then(res => res.json())
+export function getReportTxtUrl(id: string): string {
+  return `${API_BASE_URL}/api/v1/reconciliation/runs/${id}/report.txt`;
 }
