@@ -1,33 +1,18 @@
-import Link from "next/link";
+import { use } from 'react'
+import { getRun, getRunCounts } from '../../lib/api'
 
-interface RunPageProps {
-  params: Promise<{ id: string }>;
-}
-
-export default async function RunPage({ params }: RunPageProps) {
-  const { id } = await params;
-
+export default async function RunDetail({ params }) {
+  const { id } = params
+  const run = await getRun(id)
+  const counts = await getRunCounts(id)
   return (
-    <div className="min-h-screen bg-zinc-50 dark:bg-black flex flex-col">
-      <main className="flex-1 w-full max-w-3xl mx-auto py-12 px-6">
-        <div className="mb-8">
-          <Link
-            href="/"
-            className="text-zinc-600 dark:text-zinc-400 hover:text-black dark:hover:text-white"
-          >
-            ← Back to Dashboard
-          </Link>
-        </div>
-        <h1 className="text-4xl font-bold text-black dark:text-white mb-8">
-          Run #{id}
-        </h1>
-        <div className="bg-white dark:bg-zinc-900 rounded-lg shadow p-6">
-          <h2 className="text-xl font-semibold mb-4">Run Details</h2>
-          <p className="text-zinc-600 dark:text-zinc-400">
-            View details for run with ID: {id}
-          </p>
-        </div>
-      </main>
+    <div>
+      <h1>{run.status}</h1>
+      <div>Summary: {JSON.stringify(run)}</div>
+      <div>Counts: {JSON.stringify(counts)}</div>
+      <a href={`/runs/${id}/report.xlsx`}>Download XLSX</a>
+      <a href={`/runs/${id}/report.txt`}>Download TXT</a>
+      <button onClick={() => acceptRun(id)}>Accept</button>
     </div>
-  );
+  )
 }

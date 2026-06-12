@@ -1,84 +1,61 @@
-import { Run, RunDetail, ReferenceRate } from './types';
-
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
-
-export async function getRuns(): Promise<Run[]> {
-  const res = await fetch(`${API_BASE_URL}/api/v1/reconciliation/runs`);
-  if (!res.ok) throw new Error('Failed to fetch runs');
-  return res.json();
+export async function getFrontConfig() {
+  return fetch('/api/v1/front/config').then(res => res.json())
 }
 
-export async function getRunDetail(runId: string): Promise<RunDetail> {
-  const res = await fetch(`${API_BASE_URL}/api/v1/reconciliation/runs/${runId}`);
-  if (!res.ok) throw new Error('Failed to fetch run detail');
-  return res.json();
+export async function getRuns() {
+  return fetch('/api/v1/reconciliation/runs').then(res => res.json())
 }
 
-export async function getReferenceRates(): Promise<ReferenceRate[]> {
-  const res = await fetch(`${API_BASE_URL}/api/v1/reference/onlipay-groups`);
-  if (!res.ok) throw new Error('Failed to fetch reference rates');
-  return res.json();
+export async function getRun(id: string) {
+  return fetch(`/api/v1/reconciliation/runs/${id}`).then(res => res.json())
 }
 
-export async function updateReferenceRate(
-  groupCode: string,
-  rate: number,
-  minCommission: number,
-  fixedCommission: number
-): Promise<void> {
-  const res = await fetch(
-    `${API_BASE_URL}/api/v1/reference/onlipay-groups/${groupCode}`,
-    {
-      method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        rate,
-        min_commission: minCommission,
-        fixed_commission: fixedCommission,
-      }),
-    }
-  );
-  if (!res.ok) throw new Error('Failed to update reference rate');
+export async function getRunCounts(id: string) {
+  return fetch(`/api/v1/reconciliation/runs/${id}/counts`).then(res => res.json())
 }
 
-export async function createRun(
-  file: File,
-  periodStart: string,
-  periodEnd: string,
-  gatewaySumWataBase: number,
-  gatewaySumWata131: number,
-  gatewaySumWataAdult: number,
-  gatewaySumWataCase: number,
-  gatewayTotalRub: number,
-  conversionCommissionRate: number,
-  conversionCommissionAmount: number,
-  fxRate: number,
-  gatewayUsdtAmount: number,
-  chargebacksFile: File | null
-): Promise<string> {
-  const formData = new FormData();
-  formData.append('file', file);
-  formData.append('period_start', periodStart);
-  formData.append('period_end', periodEnd);
-  formData.append('gateway_sum_wata_base', gatewaySumWataBase.toString());
-  formData.append('gateway_sum_wata_131', gatewaySumWata131.toString());
-  formData.append('gateway_sum_wata_adult', gatewaySumWataAdult.toString());
-  formData.append('gateway_sum_wata_case', gatewaySumWataCase.toString());
-  formData.append('gateway_total_rub', gatewayTotalRub.toString());
-  formData.append('conversion_commission_rate', conversionCommissionRate.toString());
-  formData.append('conversion_commission_amount', conversionCommissionAmount.toString());
-  formData.append('fx_rate', fxRate.toString());
-  formData.append('gateway_usdt_amount', gatewayUsdtAmount.toString());
-  if (chargebacksFile) {
-    formData.append('chargebacks_file', chargebacksFile);
-  }
-
-  const res = await fetch(`${API_BASE_URL}/api/v1/reconciliation/runs`, {
+export async function createRun(data: any) {
+  return fetch('/api/v1/reconciliation/runs', {
     method: 'POST',
-    body: formData,
-  });
-  if (!res.ok) throw new Error('Failed to create run');
-  return res.json();
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify(data)
+  }).then(res => res.json())
+}
+
+export async function acceptRun(id: string) {
+  return fetch(`/api/v1/reconciliation/runs/${id}/accept`, {
+    method: 'POST'
+  }).then(res => res.json())
+}
+
+export async function deleteRun(id: string) {
+  return fetch(`/api/v1/reconciliation/runs/${id}`, {
+    method: 'DELETE'
+  }).then(res => res.json())
+}
+
+export async function getCommissionGroups() {
+  return fetch('/api/v1/reference/onlipay-groups').then(res => res.json())
+}
+
+export async function updateCommissionGroup(id: string, data: any) {
+  return fetch(`/api/v1/reference/onlipay-groups/${id}`, {
+    method: 'PUT',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify(data)
+  }).then(res => res.json())
+}
+
+export async function resetCommissionGroups() {
+  return fetch('/api/v1/reference/onlipay-groups/reset', {
+    method: 'POST'
+  }).then(res => res.json())
+}
+
+export async function getReportXlsxUrl(id: string) {
+  return fetch(`/api/v1/reconciliation/runs/${id}/report.xlsx`).then(res => res.json())
+}
+
+export async function getReportTxtUrl(id: string) {
+  return fetch(`/api/v1/reconciliation/runs/${id}/report.txt`).then(res => res.json())
 }
