@@ -129,12 +129,15 @@ export async function deleteRun(id: string) {
   });
 }
 
-export async function getCommissionGroups() {
-  const data = await apiFetch('/api/v1/reference/onlipay-groups');
+export async function getCommissionGroups(): Promise<unknown[]> {
+  const data: unknown = await apiFetch('/api/v1/reference/onlipay-groups');
   
   // Handle various response formats
   if (!data) return [];
   if (Array.isArray(data)) return data;
+  if (typeof data === 'object' && data !== null && 'items' in data && Array.isArray(data.items)) return data.items;
+  if (typeof data === 'object' && data !== null && 'groups' in data && Array.isArray(data.groups)) return data.groups;
+  if (typeof data === 'object' && data !== null && 'data' in data && Array.isArray(data.data)) return data.data;
   
   return [];
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { getRuns, createRun, getCommissionGroups } from '../lib/api';
 import { RunSummary, CommissionGroup } from '../lib/types';
@@ -56,6 +56,7 @@ export default function Home() {
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [uploadSuccess, setUploadSuccess] = useState<string | null>(null);
+  const [timeoutError, setTimeoutError] = useState<string | null>(null);
 
   const [formData, setFormData] = useState({
     file: null as File | null,
@@ -73,36 +74,56 @@ export default function Home() {
     chargebacks_file: null as File | null
   });
 
+  const loadRuns = useCallback(async () => {
+    setRunsLoading(true);
+    setRunsError(null);
+    try {
+      const result = await getRuns();
+      setRuns(Array.isArray(result) ? result : []);
+    } catch (err: unknown) {
+      const error = err as { message?: string };
+      setRunsError(error.message || 'Ошибка загрузки запусков');
+      setRuns([]);
+    } finally {
+      setRunsLoading(false);
+    }
+  }, []);
+
+  const loadGroups = useCallback(async () => {
+    setGroupsLoading(true);
+    setGroupsError(null);
+    try {
+      const result = await getCommissionGroups();
+      setCommissionGroups(Array.isArray(result) ? result : []);
+    } catch (err: unknown) {
+      const error = err as { message?: string };
+      setGroupsError(error.message || 'Ошибка загрузки ставок');
+      setCommissionGroups([]);
+    } finally {
+      setGroupsLoading(false);
+    }
+  }, []);
+
+  const loadData = useCallback(async () => {
+    await Promise.allSettled([loadRuns(), loadGroups()]);
+  }, [loadRuns, loadGroups]);
+
   useEffect(() => {
     loadData();
   }, []);
 
-  async function loadData() {
-    setRunsLoading(true);
-    setGroupsLoading(true);
-    setRunsError(null);
-    setGroupsError(null);
-    
-    try {
-      const runsResult = await getRuns().catch(err => {
-        setRunsError(err.message || 'Ошибка загрузки запусков');
-        return null;
-      });
-      setRuns((runsResult as RunSummary[]) || []);
-    } finally {
-      setRunsLoading(false);
-    }
+  // Timeout handler - выключает loading если запросы висят слишком долго
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      if (runsLoading || groupsLoading) {
+        setTimeoutError('Запрос занял слишком много времени');
+        setRunsLoading(false);
+        setGroupsLoading(false);
+      }
+    }, 20000);
 
-    try {
-      const groupsResult = await getCommissionGroups().catch(err => {
-        setGroupsError(err.message || 'Ошибка загрузки ставок');
-        return null;
-      });
-      setCommissionGroups(groupsResult || []);
-    } finally {
-      setGroupsLoading(false);
-    }
-  }
+    return () => clearTimeout(timeoutId);
+  }, [runsLoading, groupsLoading]);
 
   function handleInputChange(e: React.ChangeEvent<HTMLInputElement>) {
     const { name, value } = e.target;
@@ -190,6 +211,8 @@ export default function Home() {
   return (
     <div className="container">
       <h1>OnliPay Reconciliation Dashboard</h1>
+
+      {timeoutError && <div className="error mb-4">{timeoutError}</div>}
 
       <div className="grid grid-2">
         {/* Upload Card */}
@@ -427,16 +450,18 @@ export default function Home() {
           </div>
           <div className="stat-card">
             <div className="stat-value">{runs.filter(r => r.status === 'failed').length}</div>
-            <div className="stat-label">Ошибки</div>
+            <div className="stat-label">С ошибками</div>
           </div>
         </div>
       </div>
 
-      {/* Latest Runs */}
+      {/* Recent Runs */}
       <div className="card">
         <div className="card-header">
           <div className="card-title">Последние запуски</div>
+          <Link href="/runs" className="text-sm">Все запуски →</Link>
         </div>
+        
         <div className="table-container">
           <table>
             <thead>
@@ -445,21 +470,26 @@ export default function Home() {
                 <th>Статус</th>
                 <th>Период</th>
                 <th>Создан</th>
+                <th>Gateway USDT</th>
+                <th>Calculated USDT</th>
                 <th>Разница USDT</th>
+                <th>Gateway RUB</th>
+                <th>Calculated RUB</th>
+                <th>Разница RUB</th>
                 <th>Действия</th>
               </tr>
             </thead>
             <tbody>
               {runsLoading ? (
                 <tr>
-                  <td colSpan={6} className="empty-state">Загрузка запусков...</td>
+                  <td colSpan={11} className="empty-state">Загрузка запусков...</td>
                 </tr>
               ) : runs.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="empty-state">Пока нет запусков сверки</td>
+                  <td colSpan={11} className="empty-state">Пока нет запусков сверки</td>
                 </tr>
               ) : (
-                runs.slice(0, 10).map((run) => (
+                runs.slice(0, 5).map((run) => (
                   <tr key={run.id}>
                     <td className="text-sm">{run.id.slice(0, 8)}...</td>
                     <td>
@@ -471,13 +501,20 @@ export default function Home() {
                       {run.period_start} — {run.period_end}
                     </td>
                     <td className="text-sm">{formatDate(run.created_at)}</td>
+                    <td>{formatUSDT(run.gateway_usdt_amount)}</td>
+                    <td>{formatUSDT(run.calculated_usdt_amount)}</td>
                     <td className={run.usdt_difference !== 0 ? 'text-warning' : ''}>
                       {formatUSDT(run.usdt_difference)}
                     </td>
+                    <td>{formatCurrency(run.gateway_total_rub)}</td>
+                    <td>{formatCurrency(run.calculated_total_rub)}</td>
+                    <td className={run.rub_difference !== 0 ? 'text-warning' : ''}>
+                      {formatCurrency(run.rub_difference)}
+                    </td>
                     <td>
-                      <a href={`/runs/${run.id}`} className="text-sm">
+                      <Link href={`/runs/${run.id}`} className="text-sm">
                         Подробнее →
-                      </a>
+                      </Link>
                     </td>
                   </tr>
                 ))
@@ -485,18 +522,6 @@ export default function Home() {
             </tbody>
           </table>
         </div>
-        {runs.length > 0 && (
-          <Link href="/runs" className="text-sm">
-            Показать все запуски →
-          </Link>
-        )}
-      </div>
-
-      {/* Retry Button */}
-      <div className="card">
-        <button onClick={loadData} className="secondary">
-          Повторить загрузку
-        </button>
       </div>
 
       {/* Debug Block */}
@@ -505,9 +530,11 @@ export default function Home() {
         <div>API: http://10.129.0.9:8055</div>
         <div>Hydrated: yes</div>
         <div>Runs: {runs.length} items</div>
-        <div>Groups: {commissionGroups.length} items</div>
+        <div>Commission Groups: {commissionGroups.length} items</div>
         <div>Runs Loading: {runsLoading ? 'yes' : 'no'}</div>
         <div>Groups Loading: {groupsLoading ? 'yes' : 'no'}</div>
+        <div>Runs Error: {runsError || 'none'}</div>
+        <div>Groups Error: {groupsError || 'none'}</div>
       </div>
     </div>
   );
