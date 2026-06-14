@@ -56,7 +56,6 @@ export default function Home() {
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [uploadSuccess, setUploadSuccess] = useState<string | null>(null);
-  const [timeoutError, setTimeoutError] = useState<string | null>(null);
 
   const [formData, setFormData] = useState({
     file: null as File | null,
@@ -79,7 +78,7 @@ export default function Home() {
     setRunsError(null);
     try {
       const result = await getRuns();
-      setRuns(Array.isArray(result) ? result : []);
+      setRuns(Array.isArray(result) ? (result as RunSummary[]) : []);
     } catch (err: unknown) {
       const error = err as { message?: string };
       setRunsError(error.message || 'Ошибка загрузки запусков');
@@ -94,7 +93,7 @@ export default function Home() {
     setGroupsError(null);
     try {
       const result = await getCommissionGroups();
-      setCommissionGroups(Array.isArray(result) ? result : []);
+      setCommissionGroups(Array.isArray(result) ? (result as CommissionGroup[]) : []);
     } catch (err: unknown) {
       const error = err as { message?: string };
       setGroupsError(error.message || 'Ошибка загрузки ставок');
@@ -108,17 +107,25 @@ export default function Home() {
     await Promise.allSettled([loadRuns(), loadGroups()]);
   }, [loadRuns, loadGroups]);
 
+  // Initial load - используем pattern с async function внутри useEffect
   useEffect(() => {
-    loadData();
-  }, []);
+    const init = async () => {
+      await loadRuns();
+      await loadGroups();
+    };
+    init();
+  }, [loadRuns, loadGroups]);
 
   // Timeout handler - выключает loading если запросы висят слишком долго
   useEffect(() => {
     const timeoutId = setTimeout(() => {
-      if (runsLoading || groupsLoading) {
-        setTimeoutError('Запрос занял слишком много времени');
+      if (runsLoading) {
         setRunsLoading(false);
+        setRunsError('Запрос запусков занял слишком много времени');
+      }
+      if (groupsLoading) {
         setGroupsLoading(false);
+        setGroupsError('Запрос ставок занял слишком много времени');
       }
     }, 20000);
 
@@ -211,8 +218,6 @@ export default function Home() {
   return (
     <div className="container">
       <h1>OnliPay Reconciliation Dashboard</h1>
-
-      {timeoutError && <div className="error mb-4">{timeoutError}</div>}
 
       <div className="grid grid-2">
         {/* Upload Card */}
@@ -523,6 +528,18 @@ export default function Home() {
           </table>
         </div>
       </div>
+
+      {/* Retry Button */}
+      {(runsError || groupsError) && (
+        <div className="card">
+          <div className="card-header">
+            <div className="card-title">Загрузка данных</div>
+          </div>
+          <button onClick={() => loadData()} className="btn">
+            Повторить загрузку
+          </button>
+        </div>
+      )}
 
       {/* Debug Block */}
       <div className="card" style={{ fontSize: '0.75rem', fontFamily: 'monospace' }}>

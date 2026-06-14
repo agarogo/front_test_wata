@@ -40,7 +40,7 @@ export default function CommissionsPage() {
         setError(err.message || 'Ошибка загрузки ставок');
         return null;
       });
-      setGroups(result || []);
+      setGroups(result ? (Array.isArray(result) ? result as CommissionGroup[] : []) : []);
     } finally {
       setLoading(false);
     }
