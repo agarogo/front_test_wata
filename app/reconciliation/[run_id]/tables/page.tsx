@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { getRun } from '../../../../lib/api';
@@ -39,7 +39,7 @@ export default function TablesPage() {
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState(TABLE_TABS[0].key);
 
-  const loadRun = async () => {
+  const loadRun = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
@@ -52,14 +52,14 @@ export default function TablesPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [runId]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
       loadRun();
     }, 0);
     return () => clearTimeout(timer);
-  }, [runId]);
+  }, [loadRun]);
 
   if (loading) {
     return (
