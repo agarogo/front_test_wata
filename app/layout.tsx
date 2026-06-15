@@ -4,14 +4,10 @@ import AppShell from '../components/AppShell';
 
 export const metadata: Metadata = {
   title: 'OnliPay Reconciliation',
-  description: 'Frontend dashboard для сверки OnliPay/WATA',
+  description: 'Операторский интерфейс сверки WATA ↔ OnliPay',
 };
 
-export default function RootLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="ru">
       <body>

@@ -1,175 +1,49 @@
-"use client";
+'use client';
 
-import { useState, useEffect, useCallback } from 'react';
-import { useParams } from 'next/navigation';
+import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
-import { getRun, getReportXlsxUrl, getReportTxtUrl } from '../../../../lib/api';
-import { RunDetail } from '../../../../lib/types';
+import { getReport } from '../../../../lib/api';
+import type { FinancialReport } from '../../../../lib/types';
 import ApiErrorAlert from '../../../../components/ApiErrorAlert';
 import LoadingState from '../../../../components/LoadingState';
-import EmptyState from '../../../../components/EmptyState';
+import MoneyValue from '../../../../components/MoneyValue';
 
-function getRunId(run: RunDetail): string {
-  return String(run.id ?? "");
+function Row({ label, value, usdt = false }: { label: string; value: unknown; usdt?: boolean }) {
+  return <tr><td>{label}</td><td>{typeof value === 'number' || typeof value === 'string' ? <MoneyValue value={value} currency={usdt ? 'USDT' : 'RUB'} /> : '—'}</td></tr>;
 }
 
-function getShortRunId(run: RunDetail): string {
-  const id = getRunId(run);
-  return id ? id.slice(0, 8) : "—";
-}
-
-function formatCurrency(value: number | string): string {
-  const num = typeof value === 'string' ? parseFloat(value) || 0 : value;
-  return new Intl.NumberFormat('ru-RU', { style: 'currency', currency: 'RUB' }).format(num);
-}
-
-function formatUSDT(value: number): string {
-  return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(value);
-}
-
-export default function ReportPage() {
-  const params = useParams();
-  const runId = params.run_id as string;
-
-  const [run, setRun] = useState<RunDetail | null>(null);
+export default function ReportPage({ params }: { params: { run_id: string } }) {
+  const runId = decodeURIComponent(params.run_id);
+  const [report, setReport] = useState<FinancialReport | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<unknown>(null);
 
-  const loadRun = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const result = await getRun(runId);
-      setRun((result as RunDetail) || null);
-    } catch (err: unknown) {
-      const error = err as { message?: string };
-      setError(error.message || 'Ошибка загрузки запуска');
-      setRun(null);
-    } finally {
-      setLoading(false);
-    }
+  const load = useCallback(async () => {
+    setLoading(true); setError(null);
+    try { setReport(await getReport(runId)); } catch (err) { setError(err); } finally { setLoading(false); }
   }, [runId]);
 
   useEffect(() => {
-    const timer = setTimeout(() => {
-      loadRun();
-    }, 0);
-    return () => clearTimeout(timer);
-  }, [loadRun]);
-
-  if (loading) {
-    return (
-      <div className="container">
-        <div className="page-header">
-          <h1>Отчет: {runId}</h1>
-          <Link href={`/reconciliation/${runId}`} className="secondary">← Назад к запуску</Link>
-        </div>
-        <LoadingState label="Загрузка отчета..." />
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="container">
-        <div className="page-header">
-          <h1>Отчет: {runId}</h1>
-          <Link href={`/reconciliation/${runId}`} className="secondary">← Назад к запуску</Link>
-        </div>
-        <ApiErrorAlert error={error} title="Ошибка загрузки" onRetry={loadRun} />
-      </div>
-    );
-  }
-
-  if (!run) {
-    return (
-      <div className="container">
-        <div className="page-header">
-          <h1>Отчет: {runId}</h1>
-          <Link href={`/reconciliation/${runId}`} className="secondary">← Назад к запуску</Link>
-        </div>
-        <EmptyState
-          title="Запуск не найден"
-          description="Запуск с таким ID не существует или был удален"
-          action={
-            <Link href="/reconciliation/history" className="primary">
-              Вернуться к списку
-            </Link>
-          }
-        />
-      </div>
-    );
-  }
+    const timer = window.setTimeout(() => void load(), 0);
+    return () => window.clearTimeout(timer);
+  }, [load]);
 
   return (
-    <div className="container">
-      <div className="page-header">
-        <h1>Отчет: {getShortRunId(run)}...</h1>
-        <Link href={`/reconciliation/${runId}`} className="secondary">← Назад к запуску</Link>
-      </div>
-
-      {/* Financial Summary Placeholders */}
-      <div className="card">
-        <div className="card-header">
-          <div className="card-title">Финансовая сводка</div>
-        </div>
-        <div className="grid grid-2">
-          <div className="stat-card">
-            <div className="stat-value">{formatUSDT(run.gateway_usdt_amount)}</div>
-            <div className="stat-label">Gateway USDT</div>
-          </div>
-          <div className="stat-card">
-            <div className="stat-value">{formatUSDT(run.calculated_usdt_amount)}</div>
-            <div className="stat-label">Calculated USDT</div>
-          </div>
-          <div className="stat-card">
-            <div className={`stat-value ${run.usdt_difference !== 0 ? 'text-warning' : ''}`}>
-              {formatUSDT(run.usdt_difference)}
-            </div>
-            <div className="stat-label">Разница USDT</div>
-          </div>
-          <div className="stat-card">
-            <div className={`stat-value ${run.rub_difference !== 0 ? 'text-warning' : ''}`}>
-              {formatCurrency(run.rub_difference)}
-            </div>
-            <div className="stat-label">Разница RUB</div>
-          </div>
-        </div>
-      </div>
-
-      {/* Download Buttons */}
-      <div className="card">
-        <div className="card-header">
-          <div className="card-title">Скачать отчет</div>
-        </div>
-        <div className="actions">
-          <a href={getReportXlsxUrl(runId)} className="primary" download>
-            Скачать Excel (.xlsx)
-          </a>
-          <a href={getReportTxtUrl(runId)} className="secondary" download>
-            Скачать TXT (.txt)
-          </a>
-        </div>
-      </div>
-
-      {/* Info about JSON report */}
-      <div className="card">
-        <div className="card-header">
-          <div className="card-title">Информация</div>
-        </div>
-        <div className="card-body">
-          <p>
-            JSON отчет пока не доступен. Используйте Excel или TXT форматы для детального анализа.
-          </p>
-        </div>
-      </div>
-
-      {/* Retry Button */}
-      <div className="card">
-        <button onClick={loadRun} className="secondary">
-          Повторить загрузку
-        </button>
-      </div>
+    <div className="page">
+      <div className="page-header"><div><div className="page-eyebrow">Отчёт</div><h1>Финансовый отчёт</h1><p>Отчёт доступен после успешного расчёта сверки.</p></div><Link className="btn btn-secondary" href={`/reconciliation/${runId}`}>К запуску</Link></div>
+      {loading ? <LoadingState label="Загрузка отчёта..." /> : error ? <ApiErrorAlert error={error} title="Отчёт пока недоступен" onRetry={load} /> : (
+        <div className="card"><div className="card-header"><div className="card-title">Итоги</div></div><div className="table-container"><table><tbody>
+          <Row label="amount_8_1" value={report?.amount_8_1} />
+          <Row label="Gateway missing in WATA" value={report?.gateway_missing_in_wata_current ?? report?.gateway_missing_in_wata_current_total} />
+          <Row label="WATA missing in gateway" value={report?.wata_missing_in_gateway_current ?? report?.wata_missing_in_gateway_current_total} />
+          <Row label="Amount/commission discrepancies" value={report?.amount_commission_discrepancies_total} />
+          <Row label="Preliminary RUB" value={report?.preliminary_rub_amount} />
+          <Row label="Final RUB" value={report?.final_rub_amount} />
+          <Row label="Calculated USDT" value={report?.calculated_usdt_amount} usdt />
+          <Row label="Gateway USDT" value={report?.gateway_usdt_amount} usdt />
+          <Row label="USDT difference" value={report?.usdt_difference} usdt />
+        </tbody></table></div></div>
+      )}
     </div>
   );
 }

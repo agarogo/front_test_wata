@@ -1,34 +1,16 @@
-"use client";
+const labels: Record<string, string> = {
+  draft: 'Черновик',
+  data_loaded: 'Данные загружены',
+  loaded: 'Данные загружены',
+  calculated: 'Рассчитано',
+  accepted: 'Принято',
+  failed: 'Ошибка',
+  processing: 'В обработке',
+  completed: 'Завершено',
+};
 
-interface StatusBadgeProps {
-  status: string;
-}
-
-export default function StatusBadge({ status }: StatusBadgeProps) {
-  const getBadgeClass = (s: string): string => {
-    switch (s.toLowerCase()) {
-      case 'draft':
-        return 'badge-draft';
-      case 'loaded':
-        return 'badge-loaded';
-      case 'calculated':
-        return 'badge-calculated';
-      case 'accepted':
-        return 'badge-accepted';
-      case 'failed':
-        return 'badge-failed';
-      case 'processing':
-        return 'badge-processing';
-      case 'completed':
-        return 'badge-completed';
-      default:
-        return 'badge-default';
-    }
-  };
-
-  return (
-    <span className={`badge ${getBadgeClass(status)}`}>
-      {status}
-    </span>
-  );
+export default function StatusBadge({ status }: { status?: string | null }) {
+  const safe = String(status || 'draft');
+  const tone = safe.includes('fail') ? 'danger' : safe.includes('accept') || safe.includes('complete') || safe.includes('calculated') ? 'success' : safe.includes('loaded') ? 'info' : 'muted';
+  return <span className={`badge badge-${tone}`}>{labels[safe] || safe}</span>;
 }

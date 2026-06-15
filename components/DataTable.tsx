@@ -1,110 +1,64 @@
-"use client";
+'use client';
 
-import { useState, useMemo } from 'react';
+import { useMemo, useState, type ReactNode } from 'react';
+import EmptyState from './EmptyState';
 
-interface Column<T> {
-  key: keyof T;
-  label: string;
-  render?: (value: unknown, row: T) => React.ReactNode;
-  width?: string;
-}
+type Row = Record<string, unknown>;
 
-interface DataTableProps<T> {
-  columns: Column<T>[];
-  data: T[];
-  loading?: boolean;
-  emptyMessage?: string;
-  searchKey?: keyof T;
-  onSearch?: (query: string) => void;
-  maxRows?: number;
-}
+export type Column<T extends Row> = {
+  key: keyof T | string;
+  header: string;
+  render?: (value: unknown, row: T) => ReactNode;
+};
 
-export default function DataTable<T extends Record<string, unknown>>({
+export default function DataTable<T extends Row>({
+  rows,
   columns,
-  data,
-  loading = false,
-  emptyMessage = 'Нет данных',
-  searchKey,
-  onSearch,
-  maxRows = 100,
-}: DataTableProps<T>) {
-  const [searchQuery, setSearchQuery] = useState('');
+  emptyTitle = 'Нет данных',
+  searchable = true,
+}: {
+  rows: T[];
+  columns: Column<T>[];
+  emptyTitle?: string;
+  searchable?: boolean;
+}) {
+  const [query, setQuery] = useState('');
+  const filteredRows = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return rows;
+    return rows.filter((row) => JSON.stringify(row).toLowerCase().includes(q));
+  }, [query, rows]);
 
-  const filteredData = useMemo(() => {
-    if (!searchKey || !searchQuery) {
-      return data.slice(0, maxRows);
-    }
-    const query = searchQuery.toLowerCase();
-    return data.filter(row => 
-      String(row[searchKey] ?? '').toLowerCase().includes(query)
-    ).slice(0, maxRows);
-  }, [searchQuery, data, searchKey, maxRows]);
-
-  function handleSearchChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const value = e.target.value;
-    setSearchQuery(value);
-    if (onSearch) {
-      onSearch(value);
-    }
-  }
-
-  if (loading) {
-    return (
-      <div className="table-container">
-        <div className="empty-state">Загрузка...</div>
-      </div>
-    );
-  }
+  if (!rows.length) return <EmptyState title={emptyTitle} />;
 
   return (
-    <div className="table-wrapper">
-      {searchKey && (
-        <div className="table-search">
-          <input
-            type="text"
-            placeholder="Поиск..."
-            value={searchQuery}
-            onChange={handleSearchChange}
-          />
-        </div>
+    <div className="table-stack">
+      {searchable && (
+        <input
+          className="table-search"
+          value={query}
+          onChange={(event) => setQuery(event.target.value)}
+          placeholder="Поиск по таблице..."
+        />
       )}
       <div className="table-container">
         <table>
           <thead>
-            <tr>
-              {columns.map((col) => (
-                <th key={String(col.key)} style={col.width ? { width: col.width } : {}}>
-                  {col.label}
-                </th>
-              ))}
-            </tr>
+            <tr>{columns.map((column) => <th key={String(column.key)}>{column.header}</th>)}</tr>
           </thead>
           <tbody>
-            {filteredData.length === 0 ? (
-              <tr>
-                <td colSpan={columns.length} className="empty-state">
-                  {emptyMessage}
-                </td>
+            {filteredRows.slice(0, 100).map((row, index) => (
+              <tr key={index}>
+                {columns.map((column) => {
+                  const value = row[column.key as keyof T];
+                  return <td key={String(column.key)}>{column.render ? column.render(value, row) : String(value ?? '—')}</td>;
+                })}
               </tr>
-            ) : (
-              filteredData.map((row, idx) => (
-                <tr key={idx}>
-                  {columns.map((col) => (
-                    <td key={String(col.key)}>
-                      {col.render ? col.render(row[col.key], row) : String(row[col.key] ?? '')}
-                    </td>
-                  ))}
-                </tr>
-              ))
-            )}
+            ))}
           </tbody>
         </table>
       </div>
-      {data.length > maxRows && (
-        <div className="text-muted text-sm">
-          Показано {maxRows} из {data.length} записей
-        </div>
-      )}
+      {filteredRows.length > 100 && <p className="muted small">Показаны первые 100 строк из {filteredRows.length}.</p>}
     </div>
   );
 }

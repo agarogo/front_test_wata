@@ -1,5 +1,5 @@
 import { redirect } from 'next/navigation';
 
-export default function ReconciliationIndexPage() {
+export default function ReconciliationPage() {
   redirect('/reconciliation/history');
 }

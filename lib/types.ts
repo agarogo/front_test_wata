@@ -1,74 +1,147 @@
-export interface RunSummary {
-  id: string | number;
-  status: 'processing' | 'completed' | 'failed' | 'accepted' | string;
-  period_start: string;
-  period_end: string;
-  created_at: string;
-  gateway_usdt_amount: number;
-  calculated_usdt_amount: number;
-  usdt_difference: number;
-  gateway_total_rub: number;
-  calculated_total_rub: number;
-  rub_difference: number;
+export type ID = string | number;
+
+export interface ApiErrorShape {
+  message: string;
+  status?: number;
+  detail?: unknown;
+  url?: string;
 }
 
-export interface RunDetail {
-  id: string | number;
-  status: string;
-  period_start: string;
-  period_end: string;
-  created_at: string;
-  gateway_sum_wata_base: number;
-  gateway_sum_wata_131: number;
-  gateway_sum_wata_adult: number;
-  gateway_sum_wata_case: number;
-  gateway_total_rub: number;
-  conversion_commission_rate: number;
-  conversion_commission_amount: number;
-  fx_rate: number;
-  gateway_usdt_amount: number;
-  calculated_usdt_amount: number;
-  calculated_total_rub: number;
-  chargebacks_file?: string;
-  usdt_difference: number;
-  rub_difference: number;
+export interface HealthResponse {
+  status?: string;
+  service?: string;
+  version?: string;
 }
+
+export interface ReconciliationRun {
+  id?: ID;
+  run_id?: ID;
+  status?: string;
+  period_start?: string;
+  period_end?: string;
+  created_at?: string;
+  updated_at?: string;
+  gateway_final_rub_amount?: string | number;
+  fx_rate?: string | number;
+  gateway_usdt_amount?: string | number;
+  calculated_usdt_amount?: string | number;
+  usdt_difference?: string | number;
+  final_rub_amount?: string | number;
+  preliminary_rub_amount?: string | number;
+  discrepancies_count?: number;
+}
+
+export type RunSummary = ReconciliationRun;
+export type RunDetail = ReconciliationRun;
 
 export interface RunCounts {
-  total: number;
-  matched: number;
-  unmatched_gateway: number;
-  unmatched_onlipay: number;
+  total?: number;
+  matched?: number;
+  unmatched_gateway?: number;
+  unmatched_onlipay?: number;
+  wata_transactions_count?: number;
+  onlipay_transactions_count?: number;
+  matched_count?: number;
+  discrepancies_count?: number;
+  missing_in_wata?: number;
+  missing_in_onlipay?: number;
+}
+
+export interface CreateReconciliationRunRequest {
+  period_start: string;
+  period_end: string;
+  gateway_group_rub_amounts: {
+    'wata base': string;
+    'wata 131': string;
+    'wata adult': string;
+    'wata case': string;
+  };
+  gateway_final_rub_amount: string;
+  fx_rate: string;
+  gateway_usdt_amount: string;
+  conversion_commission_rate: string;
+  conversion_commission_amount: string;
+}
+
+export interface WataTransaction {
+  transaction_id: string;
+  transaction_datetime?: string;
+  product?: string;
+  merchant_id?: string;
+  merchant_name?: string;
+  terminal_id?: string;
+  terminal_name?: string;
+  payment_type?: string;
+  currency?: string;
+  status?: string;
+  transaction_type?: string;
+  transaction_amount: string | number;
+  merchant_commission_amount?: string | number;
+  gateway_commission_rate?: string | number;
+  gateway_transaction_id?: string;
+  gateway_name?: string;
+}
+
+export interface OnliPayTransaction {
+  payment_id?: string;
+  id_payment?: string;
+  gateway_transaction_id?: string;
+  server_datetime?: string;
+  server_time?: string;
+  status?: string;
+  substatus?: string;
+  operation_number?: string;
+  terminal_operation_number: string;
+  service?: string;
+  point_name?: string;
+  point?: string;
+  point_id?: string;
+  accepted_amount: string | number;
+  credited_amount?: string | number;
+  client_commission?: string | number;
+  cash_amount?: string | number;
+  provider_currency_amount?: string | number;
+  provider_transaction?: string;
+}
+
+export interface FinancialReport {
+  run_id?: string;
+  period_start?: string;
+  period_end?: string;
+  amount_8_1?: string | number;
+  gateway_missing_in_wata_current?: string | number;
+  gateway_missing_in_wata_current_total?: string | number;
+  wata_missing_in_gateway_current?: string | number;
+  wata_missing_in_gateway_current_total?: string | number;
+  amount_commission_discrepancies_total?: string | number;
+  preliminary_rub_amount?: string | number;
+  conversion_commission_amount?: string | number;
+  final_rub_amount?: string | number;
+  fx_rate?: string | number;
+  calculated_usdt_amount?: string | number;
+  gateway_usdt_amount?: string | number;
+  usdt_difference?: string | number;
+  discrepancies_count?: number;
 }
 
 export interface CommissionGroup {
-  group_code: string;
-  label: string;
-  gateway_point: string;
-  commission_rate: string;
-  min_commission: string;
-  fixed_commission: string;
+  group_code?: string;
+  group?: string;
+  group_name?: string;
+  label?: string;
+  gateway_point?: string;
+  commission_rate?: string | number;
+  group_commission_rate?: string | number;
+  min_commission?: string | number;
+  minimum_commission_amount?: string | number;
+  fixed_commission?: string | number;
+  fixed_commission_amount?: string | number;
+  is_active?: boolean;
   updated_at?: string | null;
 }
 
-export interface FrontConfig {
-  style: {
-    theme: {
-      mode: string;
-      colors: Record<string, string>;
-    };
-  };
-  ui_structure: {
-    pages: Array<{
-      route: string;
-      name: string;
-      blocks: string[];
-    }>;
-  };
-}
-
 export interface CreateRunFormData {
-  file: File;
+  file?: File;
   period_start: string;
   period_end: string;
   gateway_sum_wata_base?: number;

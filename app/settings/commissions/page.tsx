@@ -1,5 +1,5 @@
 import { redirect } from 'next/navigation';
 
-export default function LegacyCommissionsSettingsPage() {
+export default function LegacyCommissionSettingsPage() {
   redirect('/reference/commissions');
 }

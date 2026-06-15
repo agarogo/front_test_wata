@@ -1,120 +1,39 @@
-"use client";
+'use client';
 
 import { useState } from 'react';
-import { useParams } from 'next/navigation';
 import Link from 'next/link';
-import FileUploadCard from '../../../../components/FileUploadCard';
-import EmptyState from '../../../../components/EmptyState';
+import { uploadOnliPayPayments, uploadWataPayments } from '../../../../lib/api';
+import ApiErrorAlert from '../../../../components/ApiErrorAlert';
 
-export default function UploadPage() {
-  const params = useParams();
-  const runId = params.run_id as string;
+const wataSample = JSON.stringify([{ transaction_id: 'TXN001', transaction_amount: '1000', gateway_commission_rate: '0.06', conversion_commission_rate: '0', status: 'paid', transaction_type: 'payment' }], null, 2);
+const onlipaySample = JSON.stringify([{ payment_id: 'PAY001', terminal_operation_number: 'TXN001', accepted_amount: '1000', status: 'success' }], null, 2);
 
-  const [uploads, setUploads] = useState({
-    wataPayments: false,
-    onlipayWataBase: false,
-    onlipayWata131: false,
-    onlipayWataAdult: false,
-    onlipayWataCase: false,
-    refunds: false,
-    chargebacks: false
-  });
+export default function UploadPage({ params }: { params: { run_id: string } }) {
+  const runId = decodeURIComponent(params.run_id);
+  const [wataJson, setWataJson] = useState(wataSample);
+  const [onlipayJson, setOnlipayJson] = useState(onlipaySample);
+  const [group, setGroup] = useState('wata base');
+  const [error, setError] = useState<unknown>(null);
+  const [message, setMessage] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
 
-  function handleUploadComplete(key: string) {
-    setUploads(prev => ({ ...prev, [key]: true }));
+  async function uploadWata() {
+    setLoading(true); setError(null); setMessage(null);
+    try { await uploadWataPayments(runId, JSON.parse(wataJson)); setMessage('WATA данные загружены'); } catch (err) { setError(err); } finally { setLoading(false); }
   }
-
-  function getShortRunId(): string {
-    const id = String(runId ?? "");
-    return id ? id.slice(0, 8) : "—";
+  async function uploadOnliPay() {
+    setLoading(true); setError(null); setMessage(null);
+    try { await uploadOnliPayPayments(runId, group, JSON.parse(onlipayJson)); setMessage(`OnliPay данные загружены для ${group}`); } catch (err) { setError(err); } finally { setLoading(false); }
   }
 
   return (
-    <div className="container">
-      <div className="page-header">
-        <h1>Загрузка файлов: {getShortRunId()}...</h1>
-        <Link href={`/reconciliation/${runId}`} className="secondary">← Назад к запуску</Link>
-      </div>
-
-      <div className="card">
-        <div className="card-header">
-          <div className="card-title">Информация</div>
-        </div>
-        <div className="card-body">
-          <p>
-            В текущей версии системы загрузка файлов происходит через форму создания запуска.
-            Все данные загружаются одним Excel файлом при создании запуска.
-          </p>
-          <p>
-            Для создания нового запуска с загрузкой файлов перейдите на страницу создания.
-          </p>
-          <Link href="/reconciliation/new" className="primary" style={{ marginTop: '1rem' }}>
-            Создать новый запуск
-          </Link>
-        </div>
-      </div>
-
-      <EmptyState
-        title="Загрузка файлов"
-        description="Функциональность раздельной загрузки файлов пока не реализована"
-        action={
-          <Link href="/reconciliation/new" className="secondary">
-            Перейти к созданию запуска
-          </Link>
-        }
-      />
-
-      {/* Placeholder upload cards for future implementation */}
-      <div className="grid grid-2">
-        <FileUploadCard
-          title="WATA Payments"
-          description="Загрузите файл с платежами WATA"
-          uploadStatus={uploads.wataPayments ? "success" : "idle"}
-          uploadMessage={uploads.wataPayments ? "Файл отмечен как загруженный" : undefined}
-          onUpload={async () => handleUploadComplete('wataPayments')}
-        />
-        <FileUploadCard
-          title="OnliPay WATA Base"
-          description="Загрузите файл с платежами OnliPay WATA Base"
-          uploadStatus={uploads.onlipayWataBase ? "success" : "idle"}
-          uploadMessage={uploads.onlipayWataBase ? "Файл отмечен как загруженный" : undefined}
-          onUpload={async () => handleUploadComplete('onlipayWataBase')}
-        />
-        <FileUploadCard
-          title="OnliPay WATA 131"
-          description="Загрузите файл с платежами OnliPay WATA 131"
-          uploadStatus={uploads.onlipayWata131 ? "success" : "idle"}
-          uploadMessage={uploads.onlipayWata131 ? "Файл отмечен как загруженный" : undefined}
-          onUpload={async () => handleUploadComplete('onlipayWata131')}
-        />
-        <FileUploadCard
-          title="OnliPay WATA Adult"
-          description="Загрузите файл с платежами OnliPay WATA Adult"
-          uploadStatus={uploads.onlipayWataAdult ? "success" : "idle"}
-          uploadMessage={uploads.onlipayWataAdult ? "Файл отмечен как загруженный" : undefined}
-          onUpload={async () => handleUploadComplete('onlipayWataAdult')}
-        />
-        <FileUploadCard
-          title="OnliPay WATA Case"
-          description="Загрузите файл с платежами OnliPay WATA Case"
-          uploadStatus={uploads.onlipayWataCase ? "success" : "idle"}
-          uploadMessage={uploads.onlipayWataCase ? "Файл отмечен как загруженный" : undefined}
-          onUpload={async () => handleUploadComplete('onlipayWataCase')}
-        />
-        <FileUploadCard
-          title="Refunds"
-          description="Загрузите файл с возвратами (опционально)"
-          uploadStatus={uploads.refunds ? "success" : "idle"}
-          uploadMessage={uploads.refunds ? "Файл отмечен как загруженный" : undefined}
-          onUpload={async () => handleUploadComplete('refunds')}
-        />
-        <FileUploadCard
-          title="Chargebacks"
-          description="Загрузите файл с чарджбеками (опционально)"
-          uploadStatus={uploads.chargebacks ? "success" : "idle"}
-          uploadMessage={uploads.chargebacks ? "Файл отмечен как загруженный" : undefined}
-          onUpload={async () => handleUploadComplete('chargebacks')}
-        />
+    <div className="page">
+      <div className="page-header"><div><div className="page-eyebrow">Загрузка данных</div><h1>Run {runId.slice(0, 8)}</h1><p>Текущий backend принимает JSON-массивы транзакций. Excel upload можно подключить позже на backend.</p></div><Link className="btn btn-secondary" href={`/reconciliation/${runId}`}>К запуску</Link></div>
+      {error ? <ApiErrorAlert error={error} title="Ошибка загрузки" /> : null}
+      {message && <div className="alert"><strong>{message}</strong></div>}
+      <div className="grid-2">
+        <div className="card"><div className="card-header"><div className="card-title">WATA payments</div></div><textarea value={wataJson} onChange={(e) => setWataJson(e.target.value)} /><button className="btn" onClick={uploadWata} disabled={loading}>Загрузить WATA</button></div>
+        <div className="card"><div className="card-header"><div className="card-title">OnliPay payments</div></div><select value={group} onChange={(e) => setGroup(e.target.value)}><option>wata base</option><option>wata 131</option><option>wata adult</option><option>wata case</option></select><textarea value={onlipayJson} onChange={(e) => setOnlipayJson(e.target.value)} /><button className="btn" onClick={uploadOnliPay} disabled={loading}>Загрузить OnliPay</button></div>
       </div>
     </div>
   );

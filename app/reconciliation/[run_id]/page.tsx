@@ -1,192 +1,89 @@
-"use client";
+'use client';
 
-import { useState, useEffect, useCallback } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
-import { getRun, getRunCounts, acceptRun, deleteRun, getReportXlsxUrl, getReportTxtUrl } from '../../../lib/api';
-import { RunDetail, RunCounts } from '../../../lib/types';
+import { acceptRun, calculateRun, getRun, getRunCounts } from '../../../lib/api';
+import type { ReconciliationRun, RunCounts } from '../../../lib/types';
 import ApiErrorAlert from '../../../components/ApiErrorAlert';
 import LoadingState from '../../../components/LoadingState';
-import EmptyState from '../../../components/EmptyState';
 import ReconciliationSummaryCards from '../../../components/ReconciliationSummaryCards';
 
-function getRunId(run: RunDetail): string {
-  return String(run.id ?? "");
-}
-
-function getShortRunId(run: RunDetail): string {
-  const id = getRunId(run);
-  return id ? id.slice(0, 8) : "—";
-}
-
-export default function RunDetailPage() {
-  const params = useParams();
-  const router = useRouter();
-  const runId = params.run_id as string;
-
-  const [run, setRun] = useState<RunDetail | null>(null);
+export default function RunDetailPage({ params }: { params: { run_id: string } }) {
+  const runId = decodeURIComponent(params.run_id);
+  const [run, setRun] = useState<ReconciliationRun | null>(null);
   const [counts, setCounts] = useState<RunCounts | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
+  const [error, setError] = useState<unknown>(null);
+  const [message, setMessage] = useState<string | null>(null);
 
-  const loadRun = useCallback(async () => {
+  const load = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const [runResult, countsResult] = await Promise.all([
-        getRun(runId),
-        getRunCounts(runId).catch(() => null)
-      ]);
-      setRun((runResult as RunDetail) || null);
-      setCounts((countsResult as RunCounts) || null);
-    } catch (err: unknown) {
-      const error = err as { message?: string };
-      setError(error.message || 'Ошибка загрузки запуска');
-      setRun(null);
-      setCounts(null);
+      const [runResult, countsResult] = await Promise.allSettled([getRun(runId), getRunCounts(runId)]);
+      if (runResult.status === 'fulfilled') setRun(runResult.value);
+      else throw runResult.reason;
+      if (countsResult.status === 'fulfilled') setCounts(countsResult.value);
+    } catch (err) {
+      setError(err);
     } finally {
       setLoading(false);
     }
   }, [runId]);
 
   useEffect(() => {
-    const timer = setTimeout(() => {
-      loadRun();
-    }, 0);
-    return () => clearTimeout(timer);
-  }, [loadRun]);
+    const timer = window.setTimeout(() => void load(), 0);
+    return () => window.clearTimeout(timer);
+  }, [load]);
+
+  async function handleCalculate() {
+    setActionLoading(true);
+    setMessage(null);
+    try {
+      await calculateRun(runId);
+      setMessage('Расчёт выполнен');
+      await load();
+    } catch (err) {
+      setError(err);
+    } finally {
+      setActionLoading(false);
+    }
+  }
 
   async function handleAccept() {
-    if (!run) return;
-
-    if (!confirm(`Подтвердить запуск ${getShortRunId(run)}...?`)) {
-      return;
-    }
-
     setActionLoading(true);
+    setMessage(null);
     try {
       await acceptRun(runId);
-      await loadRun();
-    } catch (err: unknown) {
-      const error = err as { message?: string };
-      alert(error.message || 'Ошибка при подтверждении');
+      setMessage('Результат принят');
+      await load();
+    } catch (err) {
+      setError(err);
     } finally {
       setActionLoading(false);
     }
   }
 
-  async function handleDelete() {
-    if (!run) return;
-
-    if (!confirm(`Удалить запуск ${getShortRunId(run)}...? Это действие нельзя отменить.`)) {
-      return;
-    }
-
-    setActionLoading(true);
-    try {
-      await deleteRun(runId);
-      router.push('/reconciliation/history');
-    } catch (err: unknown) {
-      const error = err as { message?: string };
-      alert(error.message || 'Ошибка при удалении');
-    } finally {
-      setActionLoading(false);
-    }
-  }
-
-  if (loading) {
-    return (
-      <div className="container">
-        <div className="page-header">
-          <h1>Запуск сверки: {runId}</h1>
-          <Link href="/reconciliation/history" className="secondary">← К списку запусков</Link>
-        </div>
-        <LoadingState label="Загрузка данных запуска..." />
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="container">
-        <div className="page-header">
-          <h1>Запуск сверки: {runId}</h1>
-          <Link href="/reconciliation/history" className="secondary">← К списку запусков</Link>
-        </div>
-        <ApiErrorAlert error={error} title="Ошибка загрузки" onRetry={loadRun} />
-      </div>
-    );
-  }
-
-  if (!run) {
-    return (
-      <div className="container">
-        <div className="page-header">
-          <h1>Запуск сверки: {runId}</h1>
-          <Link href="/reconciliation/history" className="secondary">← К списку запусков</Link>
-        </div>
-        <EmptyState
-          title="Запуск не найден"
-          description="Запуск с таким ID не существует или был удален"
-          action={
-            <Link href="/reconciliation/history" className="primary">
-              Вернуться к списку
-            </Link>
-          }
-        />
-      </div>
-    );
-  }
+  if (loading) return <LoadingState label="Загрузка запуска..." />;
 
   return (
-    <div className="container">
+    <div className="page">
       <div className="page-header">
-        <h1>Запуск сверки: {getShortRunId(run)}...</h1>
-        <Link href="/reconciliation/history" className="secondary">← К списку запусков</Link>
+        <div><div className="page-eyebrow">Запуск</div><h1>Сверка {runId.slice(0, 8)}</h1><p>Детали, загрузка данных, расчёт и принятие результата.</p></div>
+        <div className="actions"><Link className="btn btn-secondary" href="/reconciliation/history">История</Link><Link className="btn" href={`/reconciliation/${runId}/upload`}>Загрузка данных</Link></div>
       </div>
-
+      {error ? <ApiErrorAlert error={error} title="Ошибка запуска" onRetry={load} /> : null}
+      {message && <div className="alert"><strong>{message}</strong></div>}
       <ReconciliationSummaryCards run={run} counts={counts} />
-
-      {/* Actions */}
       <div className="card">
-        <div className="card-header">
-          <div className="card-title">Действия</div>
-        </div>
+        <div className="card-header"><div className="card-title">Действия</div></div>
         <div className="actions">
-          {run.status === 'completed' && (
-            <button onClick={handleAccept} disabled={actionLoading} className="primary">
-              {actionLoading ? 'Обработка...' : 'Подтвердить'}
-            </button>
-          )}
-          {run.status !== 'accepted' && (
-            <button onClick={handleDelete} disabled={actionLoading} className="danger">
-              {actionLoading ? 'Обработка...' : 'Удалить'}
-            </button>
-          )}
-          <a href={getReportXlsxUrl(runId)} className="secondary" download>
-            Скачать Excel
-          </a>
-          <a href={getReportTxtUrl(runId)} className="secondary" download>
-            Скачать TXT
-          </a>
+          <button className="btn" onClick={handleCalculate} disabled={actionLoading}>Запустить расчёт</button>
+          <button className="btn btn-secondary" onClick={handleAccept} disabled={actionLoading}>Принять сверку</button>
+          <Link className="btn btn-secondary" href={`/reconciliation/${runId}/report`}>Открыть отчёт</Link>
+          <Link className="btn btn-secondary" href={`/reconciliation/${runId}/tables`}>Промежуточные таблицы</Link>
         </div>
-      </div>
-
-      {/* Retry Button */}
-      <div className="card">
-        <button onClick={loadRun} className="secondary">
-          Повторить загрузку
-        </button>
-      </div>
-
-      {/* Debug Block */}
-      <div className="card" style={{ fontSize: '0.75rem', fontFamily: 'monospace' }}>
-        <div className="card-title">Debug Info</div>
-        <div>API: http://10.129.0.9:5050</div>
-        <div>Hydrated: yes</div>
-        <div>Run ID: {runId}</div>
-        <div>Status: {run.status}</div>
       </div>
     </div>
   );

@@ -1,31 +1,10 @@
-"use client";
-
-interface MoneyValueProps {
-  value: number | string;
-  currency?: 'RUB' | 'USD' | 'USDT';
-  locale?: string;
+function isEmpty(value: unknown) {
+  return value === undefined || value === null || value === '' || Number.isNaN(Number(value));
 }
 
-export default function MoneyValue({ value, currency = 'RUB', locale = 'ru-RU' }: MoneyValueProps) {
-  const num = typeof value === 'string' ? parseFloat(value) || 0 : value;
-  
-  if (currency === 'RUB') {
-    return (
-      <span>
-        {new Intl.NumberFormat(locale, { 
-          style: 'currency', 
-          currency: 'RUB' 
-        }).format(num)}
-      </span>
-    );
-  }
-  
-  return (
-    <span>
-      {new Intl.NumberFormat('en-US', { 
-        style: 'currency', 
-        currency: 'USD' 
-      }).format(num)}
-    </span>
-  );
+export default function MoneyValue({ value, currency = 'RUB' }: { value?: string | number | null; currency?: 'RUB' | 'USDT' }) {
+  if (isEmpty(value)) return <span className="muted">—</span>;
+  const num = Number(value);
+  if (currency === 'USDT') return <span>{num.toLocaleString('ru-RU', { maximumFractionDigits: 6 })} USDT</span>;
+  return <span>{num.toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ₽</span>;
 }

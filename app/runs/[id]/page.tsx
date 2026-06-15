@@ -1,10 +1,6 @@
 import { redirect } from 'next/navigation';
 
-type PageProps = {
-  params: Promise<{ id: string }>;
-};
-
-export default async function LegacyRunDetailPage({ params }: PageProps) {
+export default async function LegacyRunPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   redirect(`/reconciliation/${id}`);
 }

@@ -1,303 +1,116 @@
-"use client";
+'use client';
 
 import { useState } from 'react';
-import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { createRun } from '../../../lib/api';
+import Link from 'next/link';
+import { createRun, getRunId } from '../../../lib/api';
+import type { CreateReconciliationRunRequest, ReconciliationRun } from '../../../lib/types';
 import ApiErrorAlert from '../../../components/ApiErrorAlert';
-import LoadingState from '../../../components/LoadingState';
+
+const LOCAL_RUNS_KEY = 'onlipay_reconciliation_runs';
+
+function saveLocalRun(run: ReconciliationRun) {
+  try {
+    const current = JSON.parse(localStorage.getItem(LOCAL_RUNS_KEY) || '[]') as ReconciliationRun[];
+    const id = getRunId(run);
+    localStorage.setItem(LOCAL_RUNS_KEY, JSON.stringify([run, ...current.filter((item) => getRunId(item) !== id)].slice(0, 50)));
+  } catch {}
+}
+
+const initialForm = {
+  period_start: '',
+  period_end: '',
+  gateway_final_rub_amount: '0',
+  gateway_usdt_amount: '0',
+  fx_rate: '90',
+  conversion_commission_rate: '0',
+  conversion_commission_amount: '0',
+  wata_base_rub_amount: '0',
+  wata_131_rub_amount: '0',
+  wata_adult_rub_amount: '0',
+  wata_case_rub_amount: '0',
+};
 
 export default function NewReconciliationPage() {
   const router = useRouter();
-  const [uploading, setUploading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<string | null>(null);
+  const [form, setForm] = useState(initialForm);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<unknown>(null);
 
-  const [formData, setFormData] = useState({
-    file: null as File | null,
-    period_start: '',
-    period_end: '',
-    gateway_final_rub_amount: '',
-    gateway_usdt_amount: '',
-    fx_rate: '',
-    conversion_commission_rate: '',
-    conversion_commission_amount: '',
-    wata_base_rub_amount: '',
-    wata_131_rub_amount: '',
-    wata_adult_rub_amount: '',
-    wata_case_rub_amount: ''
-  });
-
-  function handleInputChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
+  function update(field: keyof typeof form, value: string) {
+    setForm((prev) => ({ ...prev, [field]: value }));
   }
 
-  function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0] || null;
-    setFormData(prev => ({ ...prev, file }));
-  }
-
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
+  async function submit(event: React.FormEvent) {
+    event.preventDefault();
     setError(null);
-    setSuccess(null);
-
-    if (!formData.file) {
-      setError('Выберите Excel файл для загрузки');
+    if (!form.period_start || !form.period_end) {
+      setError('Укажи начало и конец периода.');
+      return;
+    }
+    if (new Date(form.period_end) < new Date(form.period_start)) {
+      setError('Конец периода не может быть раньше начала.');
+      return;
+    }
+    if (Number(form.fx_rate) <= 0) {
+      setError('Курс валюты должен быть больше 0.');
       return;
     }
 
-    if (!formData.period_start || !formData.period_end) {
-      setError('Укажите даты периода');
-      return;
-    }
+    const payload: CreateReconciliationRunRequest = {
+      period_start: form.period_start,
+      period_end: form.period_end,
+      gateway_group_rub_amounts: {
+        'wata base': form.wata_base_rub_amount || '0',
+        'wata 131': form.wata_131_rub_amount || '0',
+        'wata adult': form.wata_adult_rub_amount || '0',
+        'wata case': form.wata_case_rub_amount || '0',
+      },
+      gateway_final_rub_amount: form.gateway_final_rub_amount || '0',
+      fx_rate: form.fx_rate,
+      gateway_usdt_amount: form.gateway_usdt_amount || '0',
+      conversion_commission_rate: form.conversion_commission_rate || '0',
+      conversion_commission_amount: form.conversion_commission_amount || '0',
+    };
 
-    if (!formData.fx_rate || parseFloat(formData.fx_rate) <= 0) {
-      setError('Укажите корректный курс валюты');
-      return;
-    }
-
-    if (!formData.gateway_usdt_amount) {
-      setError('Укажите сумму в USDT');
-      return;
-    }
-
+    setSaving(true);
     try {
-      setUploading(true);
-      const form = new FormData();
-      form.append('file', formData.file);
-      form.append('period_start', formData.period_start);
-      form.append('period_end', formData.period_end);
-      form.append('fx_rate', formData.fx_rate);
-      form.append('gateway_usdt_amount', formData.gateway_usdt_amount);
-
-      if (formData.gateway_final_rub_amount) {
-        form.append('gateway_total_rub', formData.gateway_final_rub_amount);
-      }
-      if (formData.conversion_commission_rate) {
-        form.append('conversion_commission_rate', formData.conversion_commission_rate);
-      }
-      if (formData.conversion_commission_amount) {
-        form.append('conversion_commission_amount', formData.conversion_commission_amount);
-      }
-      if (formData.wata_base_rub_amount) {
-        form.append('gateway_sum_wata_base', formData.wata_base_rub_amount);
-      }
-      if (formData.wata_131_rub_amount) {
-        form.append('gateway_sum_wata_131', formData.wata_131_rub_amount);
-      }
-      if (formData.wata_adult_rub_amount) {
-        form.append('gateway_sum_wata_adult', formData.wata_adult_rub_amount);
-      }
-      if (formData.wata_case_rub_amount) {
-        form.append('gateway_sum_wata_case', formData.wata_case_rub_amount);
-      }
-
-      const result = await createRun(form);
-      const runId = result?.id || 'unknown';
-      setSuccess(`Запуск создан: ${String(runId).slice(0, 8)}...`);
-      
-      // Очистить форму
-      setFormData({
-        file: null,
-        period_start: '',
-        period_end: '',
-        gateway_final_rub_amount: '',
-        gateway_usdt_amount: '',
-        fx_rate: '',
-        conversion_commission_rate: '',
-        conversion_commission_amount: '',
-        wata_base_rub_amount: '',
-        wata_131_rub_amount: '',
-        wata_adult_rub_amount: '',
-        wata_case_rub_amount: ''
-      });
-
-      // Перенаправление на страницу запуска через небольшую задержку
-      setTimeout(() => {
-        router.push(`/reconciliation/${runId}`);
-      }, 1500);
-    } catch (err: unknown) {
-      const error = err as { message?: string };
-      setError(error.message || 'Ошибка при создании запуска');
+      const run = await createRun(payload);
+      saveLocalRun(run);
+      const id = getRunId(run);
+      router.push(id ? `/reconciliation/${id}` : '/reconciliation/history');
+    } catch (err) {
+      setError(err);
     } finally {
-      setUploading(false);
+      setSaving(false);
     }
-  }
-
-  if (uploading) {
-    return (
-      <div className="container">
-        <div className="page-header">
-          <h1>Новый запуск сверки</h1>
-          <Link href="/reconciliation/history" className="secondary">← История</Link>
-        </div>
-        <LoadingState label="Загрузка файла и создание запуска..." />
-      </div>
-    );
   }
 
   return (
-    <div className="container">
+    <div className="page">
       <div className="page-header">
-        <h1>Новый запуск сверки</h1>
-        <Link href="/reconciliation/history" className="secondary">← История</Link>
+        <div><div className="page-eyebrow">Новая сверка</div><h1>Создать запуск</h1><p>Сначала создаётся run в backend. Данные WATA/OnliPay можно загрузить на странице запуска.</p></div>
+        <Link className="btn btn-secondary" href="/reconciliation/history">История</Link>
       </div>
-
-      {error && <ApiErrorAlert error={error} title="Ошибка создания запуска" />}
-      {success && <div className="success mb-4" style={{ color: 'var(--success)' }}>{success}</div>}
-
-      <div className="card">
-        <div className="card-header">
-          <div className="card-title">Форма создания запуска</div>
+      {error ? <ApiErrorAlert error={error} title="Не удалось создать запуск" /> : null}
+      <form className="card" onSubmit={submit}>
+        <div className="card-header"><div className="card-title">Параметры сверки</div></div>
+        <div className="form-grid">
+          <div className="form-field"><label>Начало периода</label><input type="date" value={form.period_start} onChange={(e) => update('period_start', e.target.value)} required /></div>
+          <div className="form-field"><label>Конец периода</label><input type="date" value={form.period_end} onChange={(e) => update('period_end', e.target.value)} required /></div>
+          <div className="form-field"><label>Gateway Total RUB</label><input type="number" step="0.01" value={form.gateway_final_rub_amount} onChange={(e) => update('gateway_final_rub_amount', e.target.value)} /></div>
+          <div className="form-field"><label>Gateway USDT</label><input type="number" step="0.000001" value={form.gateway_usdt_amount} onChange={(e) => update('gateway_usdt_amount', e.target.value)} /></div>
+          <div className="form-field"><label>FX rate</label><input type="number" step="0.000001" value={form.fx_rate} onChange={(e) => update('fx_rate', e.target.value)} required /></div>
+          <div className="form-field"><label>Conversion commission amount</label><input type="number" step="0.01" value={form.conversion_commission_amount} onChange={(e) => update('conversion_commission_amount', e.target.value)} /></div>
+          <div className="form-field"><label>Conversion commission rate</label><input type="number" step="0.000001" value={form.conversion_commission_rate} onChange={(e) => update('conversion_commission_rate', e.target.value)} /></div>
+          <div className="form-field"><label>WATA Base RUB</label><input type="number" step="0.01" value={form.wata_base_rub_amount} onChange={(e) => update('wata_base_rub_amount', e.target.value)} /></div>
+          <div className="form-field"><label>WATA 131 RUB</label><input type="number" step="0.01" value={form.wata_131_rub_amount} onChange={(e) => update('wata_131_rub_amount', e.target.value)} /></div>
+          <div className="form-field"><label>WATA Adult RUB</label><input type="number" step="0.01" value={form.wata_adult_rub_amount} onChange={(e) => update('wata_adult_rub_amount', e.target.value)} /></div>
+          <div className="form-field"><label>WATA Case RUB</label><input type="number" step="0.01" value={form.wata_case_rub_amount} onChange={(e) => update('wata_case_rub_amount', e.target.value)} /></div>
         </div>
-
-        <form onSubmit={handleSubmit}>
-          <div className="form-group">
-            <label>Excel файл *</label>
-            <input
-              type="file"
-              accept=".xlsx,.xls,.csv"
-              onChange={handleFileChange}
-              required
-            />
-          </div>
-
-          <div className="form-row">
-            <div className="form-group">
-              <label>Начало периода *</label>
-              <input
-                type="date"
-                name="period_start"
-                value={formData.period_start}
-                onChange={handleInputChange}
-                required
-              />
-            </div>
-            <div className="form-group">
-              <label>Конец периода *</label>
-              <input
-                type="date"
-                name="period_end"
-                value={formData.period_end}
-                onChange={handleInputChange}
-                required
-              />
-            </div>
-          </div>
-
-          <div className="form-row">
-            <div className="form-group">
-              <label>Курс валюты (FX Rate) *</label>
-              <input
-                type="number"
-                name="fx_rate"
-                value={formData.fx_rate}
-                onChange={handleInputChange}
-                step="0.01"
-                min="0"
-                required
-              />
-            </div>
-            <div className="form-group">
-              <label>Сумма в USDT *</label>
-              <input
-                type="number"
-                name="gateway_usdt_amount"
-                value={formData.gateway_usdt_amount}
-                onChange={handleInputChange}
-                step="0.01"
-                required
-              />
-            </div>
-          </div>
-
-          <div className="form-group">
-            <label>Gateway Final RUB Amount</label>
-            <input
-              type="number"
-              name="gateway_final_rub_amount"
-              value={formData.gateway_final_rub_amount}
-              onChange={handleInputChange}
-              step="0.01"
-            />
-          </div>
-
-          <div className="form-row">
-            <div className="form-group">
-              <label>Conversion Commission Rate</label>
-              <input
-                type="number"
-                name="conversion_commission_rate"
-                value={formData.conversion_commission_rate}
-                onChange={handleInputChange}
-                step="0.0001"
-              />
-            </div>
-            <div className="form-group">
-              <label>Conversion Commission Amount</label>
-              <input
-                type="number"
-                name="conversion_commission_amount"
-                value={formData.conversion_commission_amount}
-                onChange={handleInputChange}
-                step="0.01"
-              />
-            </div>
-          </div>
-
-          <div className="form-row">
-            <div className="form-group">
-              <label>WATA Base RUB Amount</label>
-              <input
-                type="number"
-                name="wata_base_rub_amount"
-                value={formData.wata_base_rub_amount}
-                onChange={handleInputChange}
-                step="0.01"
-              />
-            </div>
-            <div className="form-group">
-              <label>WATA 131 RUB Amount</label>
-              <input
-                type="number"
-                name="wata_131_rub_amount"
-                value={formData.wata_131_rub_amount}
-                onChange={handleInputChange}
-                step="0.01"
-              />
-            </div>
-          </div>
-
-          <div className="form-row">
-            <div className="form-group">
-              <label>WATA Adult RUB Amount</label>
-              <input
-                type="number"
-                name="wata_adult_rub_amount"
-                value={formData.wata_adult_rub_amount}
-                onChange={handleInputChange}
-                step="0.01"
-              />
-            </div>
-            <div className="form-group">
-              <label>WATA Case RUB Amount</label>
-              <input
-                type="number"
-                name="wata_case_rub_amount"
-                value={formData.wata_case_rub_amount}
-                onChange={handleInputChange}
-                step="0.01"
-              />
-            </div>
-          </div>
-
-          <button type="submit" disabled={uploading}>
-            {uploading ? 'Загрузка...' : 'Создать запуск'}
-          </button>
-        </form>
-      </div>
+        <div className="alert"><p>Excel upload в этом backend напрямую не реализован. Для работающего сценария создай run, затем загрузи JSON-транзакции на странице запуска.</p></div>
+        <div className="actions"><button className="btn" disabled={saving}>{saving ? 'Создаю...' : 'Создать запуск'}</button></div>
+      </form>
     </div>
   );
 }
