@@ -76,7 +76,10 @@ export default function FileUploadCard({
   return (
     <div className="card">
       <div className="card-header">
-        <div className="card-title">{title}</div>
+        <div className="card-title">
+          {title}
+          {required && <span className="required-badge">*</span>}
+        </div>
         {description && <div className="text-muted text-sm">{description}</div>}
       </div>
       
@@ -87,6 +90,7 @@ export default function FileUploadCard({
             accept={accepted}
             onChange={handleFileChange}
             disabled={disabled || status === 'uploading'}
+            required={required}
           />
           {file && (
             <div className="file-info">
@@ -112,7 +116,7 @@ export default function FileUploadCard({
               disabled={disabled}
               className="primary"
             >
-              {status === 'uploading' ? 'Загрузка...' : 'Загрузить'}
+              Загрузить
             </button>
           )}
           

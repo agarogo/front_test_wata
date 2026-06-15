@@ -1,11 +1,11 @@
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useMemo } from 'react';
 
 interface Column<T> {
   key: keyof T;
   label: string;
-  render?: (value: any, row: T) => React.ReactNode;
+  render?: (value: unknown, row: T) => React.ReactNode;
   width?: string;
 }
 
@@ -19,7 +19,7 @@ interface DataTableProps<T> {
   maxRows?: number;
 }
 
-export default function DataTable<T extends { [key: string]: any }>({
+export default function DataTable<T extends Record<string, unknown>>({
   columns,
   data,
   loading = false,
@@ -29,22 +29,15 @@ export default function DataTable<T extends { [key: string]: any }>({
   maxRows = 100,
 }: DataTableProps<T>) {
   const [searchQuery, setSearchQuery] = useState('');
-  const [filteredData, setFilteredData] = useState<T[]>(data);
 
-  useEffect(() => {
-    setFilteredData(data);
-  }, [data]);
-
-  useEffect(() => {
+  const filteredData = useMemo(() => {
     if (!searchKey || !searchQuery) {
-      setFilteredData(data.slice(0, maxRows));
-      return;
+      return data.slice(0, maxRows);
     }
     const query = searchQuery.toLowerCase();
-    const filtered = data.filter(row => 
+    return data.filter(row => 
       String(row[searchKey] ?? '').toLowerCase().includes(query)
     ).slice(0, maxRows);
-    setFilteredData(filtered);
   }, [searchQuery, data, searchKey, maxRows]);
 
   function handleSearchChange(e: React.ChangeEvent<HTMLInputElement>) {
