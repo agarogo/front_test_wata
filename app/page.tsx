@@ -436,7 +436,7 @@ export default function Home() {
               </tbody>
             </table>
           </div>
-          <Link href="/settings/commissions" className="text-sm">
+          <Link href="/reference/commissions" className="text-sm">
             Настроить ставки →
           </Link>
         </div>
@@ -474,7 +474,7 @@ export default function Home() {
       <div className="card">
         <div className="card-header">
           <div className="card-title">Последние запуски</div>
-          <Link href="/runs" className="text-sm">Все запуски →</Link>
+          <Link href="/reconciliation/history" className="text-sm">Все запуски →</Link>
         </div>
         
         <div className="table-container">
@@ -527,7 +527,7 @@ export default function Home() {
                       {formatCurrency(run.rub_difference)}
                     </td>
                     <td>
-                      <Link href={`/runs/${getRunId(run)}`} className="text-sm">
+                      <Link href={`/reconciliation/${getRunId(run)}`} className="text-sm">
                         Подробнее →
                       </Link>
                     </td>
