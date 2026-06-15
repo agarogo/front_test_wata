@@ -34,7 +34,7 @@ export default function CommissionsPage() {
   async function save(group: CommissionGroup) {
     const code = getCode(group);
     setSaving(true); setError(null); setMessage(null);
-    try { await updateCommissionGroup(code, drafts[code] || {}); setMessage('Ставка отправлена в backend'); await load(); } catch (err) { setError(err); } finally { setSaving(false); }
+    try { await updateCommissionGroup(code, drafts[code] || {}); setMessage('Ставка сохранена'); await load(); } catch (err) { setError(err); } finally { setSaving(false); }
   }
 
   async function reset() {
@@ -44,7 +44,7 @@ export default function CommissionsPage() {
 
   return (
     <div className="page">
-      <div className="page-header"><div><div className="page-eyebrow">Справочник</div><h1>Комиссии OnliPay</h1><p>Backend может пока возвращать fallback-значения или 501 для сохранения. Ошибка будет показана явно.</p></div><button className="btn btn-secondary" onClick={reset} disabled={saving}>Сбросить</button></div>
+      <div className="page-header"><div><div className="page-eyebrow">Справочник</div><h1>Комиссии OnliPay</h1><p>Настройка ставок комиссий для групп OnliPay.</p></div><button className="btn btn-secondary" onClick={reset} disabled={saving}>Сбросить</button></div>
       {error ? <ApiErrorAlert error={error} title="Ошибка справочника" onRetry={load} /> : null}
       {message && <div className="alert"><strong>{message}</strong></div>}
       <div className="card">

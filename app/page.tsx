@@ -75,12 +75,12 @@ export default function DashboardPage() {
       <div className="card">
         <div className="card-header">
           <div>
-            <div className="card-title">Backend</div>
-            <p>Текущий API: http://10.129.0.9:5050</p>
+            <div className="card-title">API</div>
+            <p>API: http://10.129.0.9:5050</p>
           </div>
           <StatusBadge status={health?.status === 'healthy' ? 'completed' : 'failed'} />
         </div>
-        {error ? <ApiErrorAlert error={error} title="Backend недоступен" onRetry={load} /> : null}
+        {error ? <ApiErrorAlert error={error} title="API недоступен" onRetry={load} /> : null}
       </div>
 
       <div className="card">
@@ -89,7 +89,7 @@ export default function DashboardPage() {
           <Link className="btn btn-secondary" href="/reconciliation/history">Открыть историю</Link>
         </div>
         {loading ? <LoadingState label="Загрузка запусков..." /> : runs.length === 0 ? (
-          <EmptyState title="Пока нет запусков" description="Создай новую сверку. История сохранится в браузере, если backend пока не умеет отдавать список запусков." action={<Link className="btn" href="/reconciliation/new">Создать сверку</Link>} />
+          <EmptyState title="Пока нет запусков" description="Создай новую сверку, после этого запуск появится в списке." action={<Link className="btn" href="/reconciliation/new">Создать сверку</Link>} />
         ) : (
           <div className="table-container">
             <table>

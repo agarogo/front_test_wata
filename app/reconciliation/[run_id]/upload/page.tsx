@@ -28,12 +28,12 @@ export default function UploadPage({ params }: { params: { run_id: string } }) {
 
   return (
     <div className="page">
-      <div className="page-header"><div><div className="page-eyebrow">Загрузка данных</div><h1>Run {runId.slice(0, 8)}</h1><p>Текущий backend принимает JSON-массивы транзакций. Excel upload можно подключить позже на backend.</p></div><Link className="btn btn-secondary" href={`/reconciliation/${runId}`}>К запуску</Link></div>
+      <div className="page-header"><div><div className="page-eyebrow">Загрузка данных</div><h1>Запуск {runId.slice(0, 8)}</h1><p>Загрузи данные WATA и OnliPay для выбранного запуска.</p></div><Link className="btn btn-secondary" href={`/reconciliation/${runId}`}>К запуску</Link></div>
       {error ? <ApiErrorAlert error={error} title="Ошибка загрузки" /> : null}
       {message && <div className="alert"><strong>{message}</strong></div>}
       <div className="grid-2">
-        <div className="card"><div className="card-header"><div className="card-title">WATA payments</div></div><textarea value={wataJson} onChange={(e) => setWataJson(e.target.value)} /><button className="btn" onClick={uploadWata} disabled={loading}>Загрузить WATA</button></div>
-        <div className="card"><div className="card-header"><div className="card-title">OnliPay payments</div></div><select value={group} onChange={(e) => setGroup(e.target.value)}><option>wata base</option><option>wata 131</option><option>wata adult</option><option>wata case</option></select><textarea value={onlipayJson} onChange={(e) => setOnlipayJson(e.target.value)} /><button className="btn" onClick={uploadOnliPay} disabled={loading}>Загрузить OnliPay</button></div>
+        <div className="card"><div className="card-header"><div className="card-title">WATA данные</div></div><textarea value={wataJson} onChange={(e) => setWataJson(e.target.value)} /><button className="btn" onClick={uploadWata} disabled={loading}>Загрузить WATA</button></div>
+        <div className="card"><div className="card-header"><div className="card-title">OnliPay данные</div></div><select value={group} onChange={(e) => setGroup(e.target.value)}><option>wata base</option><option>wata 131</option><option>wata adult</option><option>wata case</option></select><textarea value={onlipayJson} onChange={(e) => setOnlipayJson(e.target.value)} /><button className="btn" onClick={uploadOnliPay} disabled={loading}>Загрузить OnliPay</button></div>
       </div>
     </div>
   );

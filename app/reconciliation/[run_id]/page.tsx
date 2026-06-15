@@ -70,7 +70,7 @@ export default function RunDetailPage({ params }: { params: { run_id: string } }
   return (
     <div className="page">
       <div className="page-header">
-        <div><div className="page-eyebrow">Запуск</div><h1>Сверка {runId.slice(0, 8)}</h1><p>Детали, загрузка данных, расчёт и принятие результата.</p></div>
+        <div><div className="page-eyebrow">Запуск</div><h1>Сверка {runId.slice(0, 8)}</h1><p>Детали запуска и основные действия.</p></div>
         <div className="actions"><Link className="btn btn-secondary" href="/reconciliation/history">История</Link><Link className="btn" href={`/reconciliation/${runId}/upload`}>Загрузка данных</Link></div>
       </div>
       {error ? <ApiErrorAlert error={error} title="Ошибка запуска" onRetry={load} /> : null}

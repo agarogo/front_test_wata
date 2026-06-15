@@ -89,7 +89,7 @@ export default function NewReconciliationPage() {
   return (
     <div className="page">
       <div className="page-header">
-        <div><div className="page-eyebrow">Новая сверка</div><h1>Создать запуск</h1><p>Сначала создаётся run в backend. Данные WATA/OnliPay можно загрузить на странице запуска.</p></div>
+        <div><div className="page-eyebrow">Новая сверка</div><h1>Создать запуск</h1><p>Заполни период и суммы для сверки.</p></div>
         <Link className="btn btn-secondary" href="/reconciliation/history">История</Link>
       </div>
       {error ? <ApiErrorAlert error={error} title="Не удалось создать запуск" /> : null}
@@ -108,7 +108,7 @@ export default function NewReconciliationPage() {
           <div className="form-field"><label>WATA Adult RUB</label><input type="number" step="0.01" value={form.wata_adult_rub_amount} onChange={(e) => update('wata_adult_rub_amount', e.target.value)} /></div>
           <div className="form-field"><label>WATA Case RUB</label><input type="number" step="0.01" value={form.wata_case_rub_amount} onChange={(e) => update('wata_case_rub_amount', e.target.value)} /></div>
         </div>
-        <div className="alert"><p>Excel upload в этом backend напрямую не реализован. Для работающего сценария создай run, затем загрузи JSON-транзакции на странице запуска.</p></div>
+        
         <div className="actions"><button className="btn" disabled={saving}>{saving ? 'Создаю...' : 'Создать запуск'}</button></div>
       </form>
     </div>

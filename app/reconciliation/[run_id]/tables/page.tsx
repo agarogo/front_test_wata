@@ -46,7 +46,7 @@ export default function TablesPage({ params }: { params: { run_id: string } }) {
 
   return (
     <div className="page">
-      <div className="page-header"><div><div className="page-eyebrow">Промежуточные таблицы</div><h1>Run {runId.slice(0, 8)}</h1><p>Технические таблицы сверки для анализа расхождений.</p></div><Link className="btn btn-secondary" href={`/reconciliation/${runId}`}>К запуску</Link></div>
+      <div className="page-header"><div><div className="page-eyebrow">Промежуточные таблицы</div><h1>Запуск {runId.slice(0, 8)}</h1><p>Таблицы и расхождения по запуску.</p></div><Link className="btn btn-secondary" href={`/reconciliation/${runId}`}>К запуску</Link></div>
       {loading ? <LoadingState label="Загрузка таблиц..." /> : error ? <ApiErrorAlert error={error} title="Tables API is not implemented yet" onRetry={load} /> : (
         <div className="card">
           <div className="actions">{tableNames.map((name) => <button key={name} className={active === name ? 'btn' : 'btn btn-secondary'} onClick={() => setActive(name)}>{name}</button>)}</div>

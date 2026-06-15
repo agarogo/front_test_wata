@@ -42,7 +42,7 @@ export default function HistoryPage() {
   return (
     <div className="page">
       <div className="page-header">
-        <div><div className="page-eyebrow">История</div><h1>Запуски сверки</h1><p>Если backend не отдаёт список запусков, показывается локальная история созданных run_id.</p></div>
+        <div><div className="page-eyebrow">История</div><h1>Запуски сверки</h1><p>Список созданных запусков и быстрые действия.</p></div>
         <Link className="btn" href="/reconciliation/new">Новая сверка</Link>
       </div>
       {error ? <ApiErrorAlert error={error} title="API истории недоступен" onRetry={load} /> : null}

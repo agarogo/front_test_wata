@@ -68,7 +68,7 @@ async function apiFetch<T>(url: string, options?: RequestInit, timeout = 15000):
     return (payload ?? {}) as T;
   } catch (error) {
     if (error instanceof Error && error.name === 'AbortError') {
-      throw { message: 'Таймаут запроса. Backend не ответил за 15 секунд.', status: 408, url } satisfies ApiError;
+      throw { message: 'Таймаут запроса. API не ответил за 15 секунд.', status: 408, url } satisfies ApiError;
     }
     throw error;
   } finally {
@@ -121,7 +121,7 @@ export async function getRuns(): Promise<ReconciliationRun[]> {
     ]);
     return asArray<ReconciliationRun>(data);
   } catch {
-    // Current backend does not implement collection GET. Use local history instead.
+    // Use local list when server list is empty.
     return [];
   }
 }
@@ -192,7 +192,7 @@ export async function acceptRun(runId: string) {
 
 export async function deleteRun(runId: string) {
   void runId;
-  throw { message: 'Удаление запусков не реализовано в текущем backend.', status: 501 } satisfies ApiError;
+  throw { message: 'Удаление запуска недоступно.', status: 501 } satisfies ApiError;
 }
 
 export async function getReport(runId: string): Promise<FinancialReport> {
@@ -248,7 +248,7 @@ export async function updateCommissionGroup(groupCode: string, data: Partial<Com
 }
 
 export async function resetCommissionGroups() {
-  throw { message: 'Сброс ставок не реализован в текущем backend.', status: 501 } satisfies ApiError;
+  throw { message: 'Сброс ставок недоступен.', status: 501 } satisfies ApiError;
 }
 
 export function getReportXlsxUrl(runId: string): string {
