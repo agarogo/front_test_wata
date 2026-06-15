@@ -46,6 +46,16 @@ function formatRate(value: string | number): string {
   return (num * 100).toFixed(2) + '%';
 }
 
+// Helper functions for safe ID handling
+function getRunId(run: RunSummary): string {
+  return String(run.id ?? "");
+}
+
+function getShortRunId(run: RunSummary): string {
+  const id = getRunId(run);
+  return id ? id.slice(0, 8) : "—";
+}
+
 export default function Home() {
   const [runs, setRuns] = useState<RunSummary[]>([]);
   const [commissionGroups, setCommissionGroups] = useState<CommissionGroup[]>([]);
@@ -494,16 +504,16 @@ export default function Home() {
                   <td colSpan={11} className="empty-state">Пока нет запусков сверки</td>
                 </tr>
               ) : (
-                runs.slice(0, 5).map((run) => (
-                  <tr key={run.id}>
-                    <td className="text-sm">{run.id.slice(0, 8)}...</td>
+                runs.slice(0, 5).map((run, index) => (
+                  <tr key={getRunId(run) || index}>
+                    <td className="text-sm">{getShortRunId(run)}...</td>
                     <td>
                       <span className={`badge ${getStatusBadgeClass(run.status)}`}>
                         {run.status}
                       </span>
                     </td>
                     <td className="text-sm">
-                      {run.period_start} — {run.period_end}
+                      {run.period_start || "—"} — {run.period_end || "—"}
                     </td>
                     <td className="text-sm">{formatDate(run.created_at)}</td>
                     <td>{formatUSDT(run.gateway_usdt_amount)}</td>
@@ -517,7 +527,7 @@ export default function Home() {
                       {formatCurrency(run.rub_difference)}
                     </td>
                     <td>
-                      <Link href={`/runs/${run.id}`} className="text-sm">
+                      <Link href={`/runs/${getRunId(run)}`} className="text-sm">
                         Подробнее →
                       </Link>
                     </td>
