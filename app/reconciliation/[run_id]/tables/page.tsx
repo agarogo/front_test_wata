@@ -3,13 +3,11 @@
 import { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
-import { getRun } from '../../lib/api';
-import { RunDetail } from '../../lib/types';
-import ApiErrorAlert from '../../components/ApiErrorAlert';
-import LoadingState from '../../components/LoadingState';
-import EmptyState from '../../components/EmptyState';
-import DataTable from '../../components/DataTable';
-
+import { getRun } from '../../../../lib/api';
+import { RunDetail } from '../../../../lib/types';
+import ApiErrorAlert from '../../../../components/ApiErrorAlert';
+import LoadingState from '../../../../components/LoadingState';
+import EmptyState from '../../../../components/EmptyState';
 function getRunId(run: RunDetail): string {
   return String(run.id ?? "");
 }
@@ -57,7 +55,10 @@ export default function TablesPage() {
   };
 
   useEffect(() => {
-    loadRun();
+    const timer = setTimeout(() => {
+      loadRun();
+    }, 0);
+    return () => clearTimeout(timer);
   }, [runId]);
 
   if (loading) {

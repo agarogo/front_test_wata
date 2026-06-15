@@ -3,27 +3,12 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { getRun, getRunCounts, acceptRun, deleteRun, getReportXlsxUrl, getReportTxtUrl } from '../../lib/api';
-import { RunDetail, RunCounts } from '../../lib/types';
-import ApiErrorAlert from '../../components/ApiErrorAlert';
-import LoadingState from '../../components/LoadingState';
-import EmptyState from '../../components/EmptyState';
-import ReconciliationSummaryCards from '../../components/ReconciliationSummaryCards';
-
-function getStatusBadgeClass(status: string): string {
-  switch (status) {
-    case 'processing':
-      return 'badge-processing';
-    case 'completed':
-      return 'badge-completed';
-    case 'failed':
-      return 'badge-failed';
-    case 'accepted':
-      return 'badge-accepted';
-    default:
-      return '';
-  }
-}
+import { getRun, getRunCounts, acceptRun, deleteRun, getReportXlsxUrl, getReportTxtUrl } from '../../../lib/api';
+import { RunDetail, RunCounts } from '../../../lib/types';
+import ApiErrorAlert from '../../../components/ApiErrorAlert';
+import LoadingState from '../../../components/LoadingState';
+import EmptyState from '../../../components/EmptyState';
+import ReconciliationSummaryCards from '../../../components/ReconciliationSummaryCards';
 
 function getRunId(run: RunDetail): string {
   return String(run.id ?? "");

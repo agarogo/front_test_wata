@@ -1,6 +1,6 @@
 export interface RunSummary {
-  id: string;
-  status: 'processing' | 'completed' | 'failed' | 'accepted';
+  id: string | number;
+  status: 'processing' | 'completed' | 'failed' | 'accepted' | string;
   period_start: string;
   period_end: string;
   created_at: string;
@@ -13,7 +13,7 @@ export interface RunSummary {
 }
 
 export interface RunDetail {
-  id: string;
+  id: string | number;
   status: string;
   period_start: string;
   period_end: string;

@@ -2,11 +2,11 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { getRuns } from '../../lib/api';
-import { RunSummary } from '../../lib/types';
-import ApiErrorAlert from '../../components/ApiErrorAlert';
-import LoadingState from '../../components/LoadingState';
-import EmptyState from '../../components/EmptyState';
+import { getRuns } from '../../../lib/api';
+import { RunSummary } from '../../../lib/types';
+import ApiErrorAlert from '../../../components/ApiErrorAlert';
+import LoadingState from '../../../components/LoadingState';
+import EmptyState from '../../../components/EmptyState';
 
 function getStatusBadgeClass(status: string): string {
   switch (status) {
@@ -74,7 +74,10 @@ export default function HistoryPage() {
   };
 
   useEffect(() => {
-    loadRuns();
+    const timer = setTimeout(() => {
+      loadRuns();
+    }, 0);
+    return () => clearTimeout(timer);
   }, []);
 
   if (loading) {

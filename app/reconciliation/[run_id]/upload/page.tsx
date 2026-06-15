@@ -3,8 +3,8 @@
 import { useState } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
-import FileUploadCard from '../../components/FileUploadCard';
-import EmptyState from '../../components/EmptyState';
+import FileUploadCard from '../../../../components/FileUploadCard';
+import EmptyState from '../../../../components/EmptyState';
 
 export default function UploadPage() {
   const params = useParams();
@@ -69,44 +69,51 @@ export default function UploadPage() {
         <FileUploadCard
           title="WATA Payments"
           description="Загрузите файл с платежами WATA"
-          uploaded={uploads.wataPayments}
-          onUpload={() => handleUploadComplete('wataPayments')}
+          uploadStatus={uploads.wataPayments ? "success" : "idle"}
+          uploadMessage={uploads.wataPayments ? "Файл отмечен как загруженный" : undefined}
+          onUpload={async () => handleUploadComplete('wataPayments')}
         />
         <FileUploadCard
           title="OnliPay WATA Base"
           description="Загрузите файл с платежами OnliPay WATA Base"
-          uploaded={uploads.onlipayWataBase}
-          onUpload={() => handleUploadComplete('onlipayWataBase')}
+          uploadStatus={uploads.onlipayWataBase ? "success" : "idle"}
+          uploadMessage={uploads.onlipayWataBase ? "Файл отмечен как загруженный" : undefined}
+          onUpload={async () => handleUploadComplete('onlipayWataBase')}
         />
         <FileUploadCard
           title="OnliPay WATA 131"
           description="Загрузите файл с платежами OnliPay WATA 131"
-          uploaded={uploads.onlipayWata131}
-          onUpload={() => handleUploadComplete('onlipayWata131')}
+          uploadStatus={uploads.onlipayWata131 ? "success" : "idle"}
+          uploadMessage={uploads.onlipayWata131 ? "Файл отмечен как загруженный" : undefined}
+          onUpload={async () => handleUploadComplete('onlipayWata131')}
         />
         <FileUploadCard
           title="OnliPay WATA Adult"
           description="Загрузите файл с платежами OnliPay WATA Adult"
-          uploaded={uploads.onlipayWataAdult}
-          onUpload={() => handleUploadComplete('onlipayWataAdult')}
+          uploadStatus={uploads.onlipayWataAdult ? "success" : "idle"}
+          uploadMessage={uploads.onlipayWataAdult ? "Файл отмечен как загруженный" : undefined}
+          onUpload={async () => handleUploadComplete('onlipayWataAdult')}
         />
         <FileUploadCard
           title="OnliPay WATA Case"
           description="Загрузите файл с платежами OnliPay WATA Case"
-          uploaded={uploads.onlipayWataCase}
-          onUpload={() => handleUploadComplete('onlipayWataCase')}
+          uploadStatus={uploads.onlipayWataCase ? "success" : "idle"}
+          uploadMessage={uploads.onlipayWataCase ? "Файл отмечен как загруженный" : undefined}
+          onUpload={async () => handleUploadComplete('onlipayWataCase')}
         />
         <FileUploadCard
           title="Refunds"
           description="Загрузите файл с возвратами (опционально)"
-          uploaded={uploads.refunds}
-          onUpload={() => handleUploadComplete('refunds')}
+          uploadStatus={uploads.refunds ? "success" : "idle"}
+          uploadMessage={uploads.refunds ? "Файл отмечен как загруженный" : undefined}
+          onUpload={async () => handleUploadComplete('refunds')}
         />
         <FileUploadCard
           title="Chargebacks"
           description="Загрузите файл с чарджбеками (опционально)"
-          uploaded={uploads.chargebacks}
-          onUpload={() => handleUploadComplete('chargebacks')}
+          uploadStatus={uploads.chargebacks ? "success" : "idle"}
+          uploadMessage={uploads.chargebacks ? "Файл отмечен как загруженный" : undefined}
+          onUpload={async () => handleUploadComplete('chargebacks')}
         />
       </div>
     </div>
