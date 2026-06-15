@@ -238,7 +238,7 @@ export default function CommissionsPage() {
 
       <div className="card" style={{ fontSize: '0.75rem', fontFamily: 'monospace' }}>
         <div className="card-title">Debug Info</div>
-        <div>API: http://10.129.0.9:8055</div>
+        <div>API: http://10.129.0.9:5050</div>
         <div>Hydrated: yes</div>
         <div>Groups: {groups.length} items</div>
         <div>Loading: {loading ? 'yes' : 'no'}</div>

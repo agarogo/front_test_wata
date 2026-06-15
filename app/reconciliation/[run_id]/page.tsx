@@ -183,7 +183,7 @@ export default function RunDetailPage() {
       {/* Debug Block */}
       <div className="card" style={{ fontSize: '0.75rem', fontFamily: 'monospace' }}>
         <div className="card-title">Debug Info</div>
-        <div>API: http://10.129.0.9:8055</div>
+        <div>API: http://10.129.0.9:5050</div>
         <div>Hydrated: yes</div>
         <div>Run ID: {runId}</div>
         <div>Status: {run.status}</div>

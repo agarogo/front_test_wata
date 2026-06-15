@@ -42,7 +42,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             <span className="app-title">OnliPay Reconciliation</span>
           </div>
           <div className="top-bar-right">
-            <span className="api-status">API: http://10.129.0.9:8055</span>
+            <span className="api-status">API: http://10.129.0.9:5050</span>
           </div>
         </header>
         <div className="content-area">
