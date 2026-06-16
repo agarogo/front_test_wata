@@ -63,15 +63,15 @@ h3 { font-size: 16px; margin: 0; color: var(--text); }
 .actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 
 /* Buttons */
-.btn, button { border: none; cursor: pointer; border-radius: 6px; padding: 8px 14px; font-weight: 600; background: var(--primary); color: #fff; display: inline-flex; align-items: center; justify-content: center; gap: 6px; transition: background 0.15s; }
-.btn:hover, button:hover { background: var(--primary-hover); }
+.btn, button { border: none; cursor: pointer; border-radius: 6px; padding: 8px 14px; font-weight: 600; background: var(--success); color: #fff; display: inline-flex; align-items: center; justify-content: center; gap: 6px; transition: background 0.15s; }
+.btn:hover, button:hover { background: #15803d; }
 .btn:disabled, button:disabled { opacity: 0.55; cursor: not-allowed; }
 .btn-secondary, button.secondary { background: var(--surface-alt); color: var(--text); border: 1px solid var(--border); }
-.btn-secondary:hover, button.secondary:hover { background: var(--primary-light); }
+.btn-secondary:hover, button.secondary:hover { background: #dcfce7; }
 .btn-danger, button.danger { background: var(--danger); color: #fff; }
 .btn-danger:hover, button.danger:hover { background: #b91c1c; }
-.btn-ghost { background: transparent; color: var(--primary); border: 1px solid var(--primary-light); }
-.btn-ghost:hover { background: var(--primary-light); }
+.btn-ghost { background: transparent; color: var(--success); border: 1px solid #86efac; }
+.btn-ghost:hover { background: #dcfce7; }
 
 /* Grids */
 .grid-3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
