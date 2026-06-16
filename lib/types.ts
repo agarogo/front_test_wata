@@ -29,6 +29,12 @@ export interface ReconciliationRun {
   final_rub_amount?: string | number;
   preliminary_rub_amount?: string | number;
   discrepancies_count?: number;
+  parsed_counts?: Record<string, number>;
+  db_counts?: Record<string, number>;
+  financial_report?: FinancialReport;
+  missing_counts?: Record<string, number>;
+  report_downloads?: { xlsx?: string; txt?: string };
+  warnings?: string[];
 }
 
 export type RunSummary = ReconciliationRun;
@@ -50,21 +56,31 @@ export interface RunCounts {
 export interface CreateReconciliationRunRequest {
   period_start: string;
   period_end: string;
-  gateway_group_rub_amounts: {
-    'wata base': string;
-    'wata 131': string;
-    'wata adult': string;
-    'wata case': string;
-  };
-  gateway_final_rub_amount: string;
-  fx_rate: string;
-  gateway_usdt_amount: string;
-  conversion_commission_rate: string;
-  conversion_commission_amount: string;
+  gateway_group_rub_amounts: Record<string, string | number>;
+  gateway_final_rub_amount: string | number;
+  fx_rate: string | number;
+  gateway_usdt_amount: string | number;
+  conversion_commission_rate: string | number;
+  conversion_commission_amount: string | number;
+}
+
+export interface ExcelRunFormInput {
+  file: File;
+  period_start: string;
+  period_end: string;
+  gateway_final_rub_amount: string | number;
+  fx_rate: string | number;
+  gateway_usdt_amount: string | number;
+  conversion_commission_rate?: string | number;
+  conversion_commission_amount?: string | number;
+  wata_base_rub_amount?: string | number;
+  wata_131_rub_amount?: string | number;
+  wata_adult_rub_amount?: string | number;
+  wata_case_rub_amount?: string | number;
 }
 
 export interface WataTransaction {
-  transaction_id: string;
+  transaction_id?: string;
   transaction_datetime?: string;
   product?: string;
   merchant_id?: string;
@@ -75,11 +91,12 @@ export interface WataTransaction {
   currency?: string;
   status?: string;
   transaction_type?: string;
-  transaction_amount: string | number;
+  transaction_amount?: string | number;
   merchant_commission_amount?: string | number;
   gateway_commission_rate?: string | number;
   gateway_transaction_id?: string;
   gateway_name?: string;
+  [key: string]: unknown;
 }
 
 export interface OnliPayTransaction {
@@ -91,17 +108,18 @@ export interface OnliPayTransaction {
   status?: string;
   substatus?: string;
   operation_number?: string;
-  terminal_operation_number: string;
+  terminal_operation_number?: string;
   service?: string;
   point_name?: string;
   point?: string;
   point_id?: string;
-  accepted_amount: string | number;
+  accepted_amount?: string | number;
   credited_amount?: string | number;
   client_commission?: string | number;
   cash_amount?: string | number;
   provider_currency_amount?: string | number;
   provider_transaction?: string;
+  [key: string]: unknown;
 }
 
 export interface FinancialReport {
@@ -122,6 +140,7 @@ export interface FinancialReport {
   gateway_usdt_amount?: string | number;
   usdt_difference?: string | number;
   discrepancies_count?: number;
+  [key: string]: unknown;
 }
 
 export interface CommissionGroup {

@@ -17,7 +17,8 @@ function readLocalRuns(): ReconciliationRun[] {
 }
 
 function formatDate(value?: string) {
-  return value ? new Date(value).toLocaleString('ru-RU') : '—';
+  if (!value) return '—';
+  return value.replace('T', ' ').slice(0, 16);
 }
 
 export default function DashboardPage() {
@@ -69,6 +70,7 @@ export default function DashboardPage() {
       <div className="grid-3">
         <div className="metric-card"><span>Всего запусков</span><strong>{stats.total}</strong></div>
         <div className="metric-card"><span>Завершено</span><strong>{stats.done}</strong></div>
+        <div className="metric-card"><span>В обработке</span><strong>{stats.processing}</strong></div>
         <div className="metric-card"><span>Ошибки</span><strong>{stats.failed}</strong></div>
       </div>
 

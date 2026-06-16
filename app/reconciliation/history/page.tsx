@@ -11,6 +11,11 @@ import StatusBadge from '../../../components/StatusBadge';
 
 const LOCAL_RUNS_KEY = 'onlipay_reconciliation_runs';
 
+function formatDate(value?: string) {
+  if (!value) return '—';
+  return value.replace('T', ' ').slice(0, 16);
+}
+
 function readLocalRuns(): ReconciliationRun[] {
   try { return JSON.parse(localStorage.getItem(LOCAL_RUNS_KEY) || '[]') as ReconciliationRun[]; } catch { return []; }
 }
@@ -60,7 +65,7 @@ export default function HistoryPage() {
                     <td className="key-field">{id || '—'}</td>
                     <td><StatusBadge status={run.status} /></td>
                     <td>{run.period_start || '—'} — {run.period_end || '—'}</td>
-                    <td>{run.created_at ? new Date(run.created_at).toLocaleString('ru-RU') : '—'}</td>
+                    <td>{formatDate(run.created_at)}</td>
                     <td className="actions">
                       <Link className="btn btn-secondary" href={`/reconciliation/${id}`}>Открыть</Link>
                       <Link className="btn btn-ghost" href={`/reconciliation/${id}/report`}>Отчёт</Link>
