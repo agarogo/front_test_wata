@@ -30,6 +30,12 @@ const FALLBACK_COMMISSION_GROUPS: CommissionGroup[] = [
   { group_code: 'wata case', label: 'wata case', gateway_point: 'WataCase', commission_rate: '0.08', min_commission: '0', fixed_commission: '0' },
 ];
 
+const rawTimeout = Number(process.env.NEXT_PUBLIC_API_TIMEOUT_MS);
+export const API_TIMEOUT_MS =
+  Number.isFinite(rawTimeout) && rawTimeout >= 3600000
+    ? rawTimeout
+    : 3600000;
+
 function normalizeErrorPayload(payload: unknown, fallback: string): string {
   if (!payload) return fallback;
   if (typeof payload === 'string') return payload;
@@ -44,7 +50,7 @@ function normalizeErrorPayload(payload: unknown, fallback: string): string {
   return fallback;
 }
 
-async function apiFetch<T>(url: string, options?: RequestInit, timeout = 20000): Promise<T> {
+async function apiFetch<T>(url: string, options?: RequestInit, timeout = API_TIMEOUT_MS): Promise<T> {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), timeout);
   const fullUrl = `${API_BASE_URL}${url}`;
@@ -80,7 +86,7 @@ async function apiFetch<T>(url: string, options?: RequestInit, timeout = 20000):
     return (payload ?? {}) as T;
   } catch (error) {
     if (error instanceof Error && error.name === 'AbortError') {
-      throw { message: 'Таймаут запроса. API не ответил за 20 секунд.', status: 408, url } satisfies ApiError;
+      throw { message: `Таймаут запроса. API не ответил за ${Math.round(API_TIMEOUT_MS / 60000)} минут.`, status: 408, url } satisfies ApiError;
     }
     throw error;
   } finally {
