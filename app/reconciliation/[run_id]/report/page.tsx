@@ -19,31 +19,27 @@ export default function ReportPage({ params }: { params: Promise<{ run_id: strin
   const runId = decodeURIComponent(run_id);
   const [report, setReport] = useState<FinancialReport | null>(null);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<unknown>(null);
-  const [showCachedWarning, setShowCachedWarning] = useState(false);
 
-  const load = useCallback(async () => {
-    setLoading(true);
+  const load = useCallback(async (showSpinner = true) => {
+    if (showSpinner) setLoading(true);
+    else setRefreshing(true);
     setError(null);
-    setShowCachedWarning(false);
-    
     const cached = getCachedReport(runId);
     if (cached) {
-      setReport(cached as FinancialReport);
+      setReport(cached);
+      setLoading(false);
     }
-    
     try {
-      const fetched = await getReport(runId);
-      setReport(fetched);
-      setCachedReport(runId, fetched);
+      const fresh = await getReport(runId);
+      setReport(fresh);
+      setCachedReport(runId, fresh);
     } catch (err) {
-      if (cached) {
-        setShowCachedWarning(true);
-      } else {
-        setError(err);
-      }
+      if (!cached) setError(err);
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
   }, [runId]);
 
@@ -51,10 +47,6 @@ export default function ReportPage({ params }: { params: Promise<{ run_id: strin
     const timer = window.setTimeout(() => void load(), 0);
     return () => window.clearTimeout(timer);
   }, [load]);
-
-  async function handleRefresh() {
-    await load();
-  }
 
   return (
     <div className="page">
@@ -65,22 +57,21 @@ export default function ReportPage({ params }: { params: Promise<{ run_id: strin
           <p>Итоговые суммы, расхождения и скачивание отчёта.</p>
         </div>
         <div className="actions">
-          <button className="btn btn-secondary" onClick={handleRefresh} disabled={loading}>Обновить отчёт</button>
-          <a className="btn" href={getReportXlsxUrl(runId)}>Скачать XLSX</a>
-          <a className="btn btn-secondary" href={getReportTxtUrl(runId)}>Скачать TXT</a>
+          <button className="btn btn-secondary" onClick={() => void load(false)} disabled={refreshing}>{refreshing ? 'Обновляю...' : 'Обновить отчёт'}</button>
+          <a className="btn" href={getReportXlsxUrl(runId)}>Скачать Excel отчёт</a>
+          <a className="btn btn-secondary" href={getReportTxtUrl(runId)}>Скачать TXT отчёт</a>
           <Link className="btn btn-secondary" href={`/reconciliation/${runId}`}>К запуску</Link>
         </div>
       </div>
 
       {loading && !report ? <LoadingState label="Загрузка отчёта..." /> : error ? (
         <div className="card">
-          <ApiErrorAlert error={error} title="Отчёт пока не сформирован" onRetry={load} />
+          <ApiErrorAlert error={error} title="Отчёт пока не сформирован" onRetry={() => load(false)} />
           <EmptyState title="Отчёт пока не сформирован" description="Запусти расчёт, после этого отчёт появится здесь." />
         </div>
       ) : (
         <div className="card">
           <div className="card-header"><div className="card-title">Итоги</div></div>
-          {showCachedWarning && <div className="alert" style={{ marginTop: '0.5rem' }}><strong>Показаны сохранённые данные</strong></div>}
           <div className="table-container"><table><tbody>
             <Row label="amount_8_1" value={report?.amount_8_1} />
             <Row label="Gateway missing in WATA" value={report?.gateway_missing_in_wata_current ?? report?.gateway_missing_in_wata_current_total} />

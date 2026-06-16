@@ -4,23 +4,26 @@ import { use, useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { getTables } from '../../../../lib/api';
 import { getCachedTables, setCachedTables } from '../../../../lib/run-cache';
+import type { ReconciliationTables } from '../../../../lib/types';
 import ApiErrorAlert from '../../../../components/ApiErrorAlert';
 import DataTable from '../../../../components/DataTable';
 import EmptyState from '../../../../components/EmptyState';
 import LoadingState from '../../../../components/LoadingState';
 
-const tableNames = [
-  'wata_payments',
-  'onlipay_payments',
-  'carry_over_payments',
-  'carry_over_payments_pending',
-  'gateway_missing_in_wata_current',
-  'gateway_missing_in_wata_resolved',
-  'wata_missing_in_gateway_current',
-  'wata_missing_in_gateway_resolved',
-  'amount_commission_discrepancies',
-  'db_counts',
-];
+const tableLabels: Record<string, string> = {
+  wata_payments: 'WATA payments',
+  carry_over_payments: 'Carry-over payments',
+  onlipay_payments: 'OnliPay payments',
+  carry_over_payments_pending: 'Carry-over pending',
+  gateway_missing_in_wata_current: 'Gateway missing in WATA',
+  gateway_missing_in_wata_resolved: 'Gateway missing in WATA resolved',
+  wata_missing_in_gateway_current: 'WATA missing in gateway',
+  wata_missing_in_gateway_resolved: 'WATA missing in gateway resolved',
+  amount_commission_discrepancies: 'Amount/commission discrepancies',
+  db_counts: 'DB counts',
+};
+
+const orderedTables = Object.keys(tableLabels);
 
 function rowsFromValue(value: unknown): Record<string, unknown>[] {
   if (Array.isArray(value)) return value.map((row) => row && typeof row === 'object' ? row as Record<string, unknown> : { value: row });
@@ -38,34 +41,30 @@ function rowsFromValue(value: unknown): Record<string, unknown>[] {
 export default function TablesPage({ params }: { params: Promise<{ run_id: string }> }) {
   const { run_id } = use(params);
   const runId = decodeURIComponent(run_id);
-  const [tables, setTables] = useState<Record<string, unknown>>({});
-  const [active, setActive] = useState(tableNames[0]);
+  const [tables, setTables] = useState<ReconciliationTables>({});
+  const [active, setActive] = useState(orderedTables[0]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<unknown>(null);
-  const [showCachedWarning, setShowCachedWarning] = useState(false);
 
-  const load = useCallback(async () => {
-    setLoading(true);
+  const load = useCallback(async (showSpinner = true) => {
+    if (showSpinner) setLoading(true);
+    else setRefreshing(true);
     setError(null);
-    setShowCachedWarning(false);
-    
     const cached = getCachedTables(runId);
     if (cached) {
       setTables(cached);
+      setLoading(false);
     }
-    
     try {
-      const fetched = await getTables(runId);
-      setTables(fetched);
-      setCachedTables(runId, fetched);
+      const fresh = await getTables(runId);
+      setTables(fresh);
+      setCachedTables(runId, fresh);
     } catch (err) {
-      if (cached) {
-        setShowCachedWarning(true);
-      } else {
-        setError(err);
-      }
+      if (!cached) setError(err);
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
   }, [runId]);
 
@@ -74,23 +73,17 @@ export default function TablesPage({ params }: { params: Promise<{ run_id: strin
     return () => window.clearTimeout(timer);
   }, [load]);
 
-  async function handleRefresh() {
-    await load();
-  }
-
   const availableNames = useMemo(() => {
     const fromApi = Object.keys(tables).filter((key) => key !== 'run_id');
-    return Array.from(new Set([...tableNames, ...fromApi]));
+    return Array.from(new Set([...orderedTables, ...fromApi]));
   }, [tables]);
 
-  const allRows = useMemo(() => rowsFromValue(tables[active]), [tables, active]);
-  const rows = useMemo(() => allRows.slice(0, 100), [allRows]);
-  const truncated = allRows.length > 100;
-
+  const rows = useMemo(() => rowsFromValue(tables[active]), [tables, active]);
   const columns = useMemo(() => {
-    const first = rows[0] || {};
-    const keys = Object.keys(first).slice(0, 10);
-    return (keys.length ? keys : ['key', 'value']).map((key) => ({ key, header: key }));
+    const preferred = ['transaction_id', 'terminal_operation_number', 'payment_id', 'server_time', 'transaction_datetime', 'status', 'substatus', 'transaction_amount', 'accepted_amount', 'gateway_commission_amount', 'discrepancy_effect'];
+    const allKeys = Array.from(new Set(rows.flatMap((row) => Object.keys(row))));
+    const ordered = [...preferred.filter((key) => allKeys.includes(key)), ...allKeys.filter((key) => !preferred.includes(key))].slice(0, 12);
+    return (ordered.length ? ordered : ['key', 'value']).map((key) => ({ key, header: key }));
   }, [rows]);
 
   return (
@@ -98,27 +91,19 @@ export default function TablesPage({ params }: { params: Promise<{ run_id: strin
       <div className="page-header">
         <div>
           <div className="page-eyebrow">Промежуточные таблицы</div>
-          <h1>Запуск {runId.length > 8 ? runId.slice(0, 8) : runId}</h1>
-          <p>Данные загрузки, переносы и расхождения по запуску.</p>
+          <h1>Запуск {runId.slice(0, 8)}</h1>
+          <p>Главная связка сверки: WATA transaction_id = OnliPay terminal_operation_number.</p>
         </div>
         <div className="actions">
-          <button className="btn btn-secondary" onClick={handleRefresh} disabled={loading}>Обновить таблицы</button>
+          <button className="btn btn-secondary" onClick={() => void load(false)} disabled={refreshing}>{refreshing ? 'Обновляю...' : 'Обновить таблицы'}</button>
           <Link className="btn btn-secondary" href={`/reconciliation/${runId}`}>К запуску</Link>
         </div>
       </div>
 
-      {loading && !tables[active] ? <LoadingState label="Загрузка таблиц..." /> : error ? (
-        <ApiErrorAlert error={error} title="Ошибка загрузки таблиц" onRetry={load} />
-      ) : (
+      {loading && !Object.keys(tables).length ? <LoadingState label="Загрузка таблиц..." /> : error ? <ApiErrorAlert error={error} title="Ошибка загрузки таблиц" onRetry={() => load(false)} /> : (
         <div className="card">
-          <div className="actions">{availableNames.map((name) => <button key={name} className={active === name ? 'btn' : 'btn btn-secondary'} onClick={() => setActive(name)}>{name}</button>)}</div>
-          {showCachedWarning && <div className="alert" style={{ marginTop: '0.5rem' }}><strong>Показаны сохранённые данные</strong></div>}
-          {rows.length ? (
-            <>
-              <DataTable rows={rows} columns={columns} />
-              {truncated && <p style={{ marginTop: '0.5rem', color: '#666' }}>Показаны первые 100 строк</p>}
-            </>
-          ) : <EmptyState title="Таблицы пока пустые" description={active} />}
+          <div className="actions">{availableNames.map((name) => <button key={name} className={active === name ? 'btn' : 'btn btn-secondary'} onClick={() => setActive(name)}>{tableLabels[name] || name}</button>)}</div>
+          {rows.length ? <DataTable rows={rows} columns={columns} emptyTitle="Таблицы пока пустые" /> : <EmptyState title="Таблицы пока пустые" description={tableLabels[active] || active} />}
         </div>
       )}
     </div>

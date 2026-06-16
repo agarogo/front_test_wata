@@ -5,9 +5,11 @@ const labels: Record<string, string> = {
   calculated: 'Рассчитано',
   accepted: 'Принято',
   failed: 'Ошибка',
-  processing: 'В обработке',
   pending: 'В обработке',
+  processing: 'В обработке',
   completed: 'Завершено',
+  success: 'Успешно',
+  healthy: 'Online',
 };
 
 export default function StatusBadge({ status }: { status?: string | null }) {

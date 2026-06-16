@@ -1,172 +1,125 @@
-import type { ReconciliationRun } from './types';
+import type { FinancialReport, ReconciliationRun, RunSummary, ReconciliationTables } from './types';
 
 const RUNS_INDEX_KEY = 'onlipay:runs:index:v1';
-const RUN_DETAIL_KEY_PREFIX = 'onlipay:run:detail:';
-const RUN_REPORT_KEY_PREFIX = 'onlipay:run:report:';
-const RUN_TABLES_KEY_PREFIX = 'onlipay:run:tables:';
+const LEGACY_RUNS_INDEX_KEY = 'onlipay_reconciliation_runs';
+const DETAIL_PREFIX = 'onlipay:run:detail:';
+const REPORT_PREFIX = 'onlipay:run:report:';
+const TABLES_PREFIX = 'onlipay:run:tables:';
+const SUFFIX = ':v1';
 
-function safeGetItem(key: string): string | null {
-  if (typeof window === 'undefined') return null;
-  try {
-    return window.localStorage.getItem(key);
-  } catch {
-    return null;
-  }
+function canUseStorage() {
+  return typeof window !== 'undefined' && Boolean(window.localStorage);
 }
 
-function safeSetItem(key: string, value: string): boolean {
-  if (typeof window === 'undefined') return false;
+function readJson<T>(key: string, fallback: T): T {
+  if (!canUseStorage()) return fallback;
   try {
-    window.localStorage.setItem(key, value);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-function safeParse<T>(value: string | null): T | null {
-  if (!value) return null;
-  try {
+    const value = window.localStorage.getItem(key);
+    if (!value) return fallback;
     return JSON.parse(value) as T;
   } catch {
-    return null;
+    return fallback;
   }
 }
 
-function safeStringify(value: unknown): string | null {
+function writeJson(key: string, value: unknown) {
+  if (!canUseStorage()) return;
   try {
-    return JSON.stringify(value);
+    window.localStorage.setItem(key, JSON.stringify(value));
   } catch {
-    return null;
+    // Large tables may exceed localStorage quota. Cache must never break UI.
   }
 }
 
-export function getRunId(run: Pick<ReconciliationRun, 'id' | 'run_id'> | null | undefined): string {
+export function getRunId(run: { id?: string | number; run_id?: string | number } | null | undefined): string {
   return String(run?.id ?? run?.run_id ?? '');
 }
 
-export function getCachedRunIndex(): ReconciliationRun[] {
-  const value = safeGetItem(RUNS_INDEX_KEY);
-  const parsed = safeParse<ReconciliationRun[]>(value);
-  return Array.isArray(parsed) ? parsed : [];
-}
-
-export function upsertCachedRun(run: Partial<ReconciliationRun> & { id?: string | number; run_id?: string | number }): void {
+function normalizeRun(run: Partial<RunSummary> & { id?: string | number; run_id?: string | number }): RunSummary | null {
   const id = getRunId(run);
-  if (!id) return;
-  
-  const current = getCachedRunIndex();
-  const existingIndex = current.findIndex((r) => getRunId(r) === id);
-  
-  const normalized: ReconciliationRun = {
+  if (!id) return null;
+  return {
     ...run,
-    id: run.id ?? run.run_id,
-    run_id: run.run_id ?? run.id,
+    id: run.id ?? id,
+    run_id: run.run_id ?? id,
     status: run.status ?? 'pending',
-    created_at: run.created_at ?? new Date().toISOString(),
-  };
-  
-  if (existingIndex >= 0) {
-    current[existingIndex] = normalized;
-  } else {
-    current.unshift(normalized);
-  }
-  
-  current.slice(0, 100);
-  
-  const serialized = safeStringify(current);
-  if (serialized) {
-    safeSetItem(RUNS_INDEX_KEY, serialized);
-  }
+  } as RunSummary;
 }
 
-export function upsertCachedRuns(runs: ReconciliationRun[]): void {
-  if (!Array.isArray(runs)) return;
-  
-  const current = getCachedRunIndex();
-  const currentIds = new Set(current.map(getRunId));
-  
-  for (const run of runs) {
+function mergeRuns(primary: RunSummary[], secondary: RunSummary[]): RunSummary[] {
+  const map = new Map<string, RunSummary>();
+  for (const run of secondary) {
     const id = getRunId(run);
-    if (!id) continue;
-    
-    if (!currentIds.has(id)) {
-      current.unshift(run);
-      currentIds.add(id);
-    }
+    if (id) map.set(id, run);
   }
-  
-  current.slice(0, 100);
-  
-  const serialized = safeStringify(current);
-  if (serialized) {
-    safeSetItem(RUNS_INDEX_KEY, serialized);
+  for (const run of primary) {
+    const id = getRunId(run);
+    if (id) map.set(id, { ...(map.get(id) || {}), ...run });
   }
+  return Array.from(map.values()).sort((a, b) => String(b.created_at || '').localeCompare(String(a.created_at || ''))).slice(0, 200);
+}
+
+export function getCachedRunIndex(): RunSummary[] {
+  const current = readJson<RunSummary[]>(RUNS_INDEX_KEY, []);
+  if (current.length) return current;
+  const legacy = readJson<RunSummary[]>(LEGACY_RUNS_INDEX_KEY, []);
+  if (legacy.length) {
+    writeJson(RUNS_INDEX_KEY, legacy);
+  }
+  return legacy;
+}
+
+export function upsertCachedRun(run: Partial<RunSummary> & { id?: string | number; run_id?: string | number }): void {
+  const normalized = normalizeRun(run);
+  if (!normalized) return;
+  const current = getCachedRunIndex();
+  writeJson(RUNS_INDEX_KEY, mergeRuns([normalized], current));
+}
+
+export function upsertCachedRuns(runs: RunSummary[]): void {
+  const normalized = runs.map((run) => normalizeRun(run)).filter(Boolean) as RunSummary[];
+  if (!normalized.length) return;
+  writeJson(RUNS_INDEX_KEY, mergeRuns(normalized, getCachedRunIndex()));
 }
 
 export function getCachedRunDetail(runId: string): ReconciliationRun | null {
-  const key = RUN_DETAIL_KEY_PREFIX + runId + ':v1';
-  const value = safeGetItem(key);
-  return safeParse<ReconciliationRun>(value);
+  return readJson<ReconciliationRun | null>(`${DETAIL_PREFIX}${runId}${SUFFIX}`, null);
 }
 
 export function setCachedRunDetail(runId: string, run: ReconciliationRun): void {
-  const key = RUN_DETAIL_KEY_PREFIX + runId + ':v1';
-  const serialized = safeStringify(run);
-  if (serialized) {
-    safeSetItem(key, serialized);
-  }
+  writeJson(`${DETAIL_PREFIX}${runId}${SUFFIX}`, run);
+  upsertCachedRun({ ...run, id: run.id ?? runId, run_id: run.run_id ?? runId });
 }
 
-export function getCachedReport(runId: string): unknown | null {
-  const key = RUN_REPORT_KEY_PREFIX + runId + ':v1';
-  const value = safeGetItem(key);
-  return safeParse<unknown>(value);
+export function getCachedReport(runId: string): FinancialReport | null {
+  return readJson<FinancialReport | null>(`${REPORT_PREFIX}${runId}${SUFFIX}`, null);
 }
 
-export function setCachedReport(runId: string, report: unknown): void {
-  const key = RUN_REPORT_KEY_PREFIX + runId + ':v1';
-  const serialized = safeStringify(report);
-  if (serialized) {
-    safeSetItem(key, serialized);
-  }
+export function setCachedReport(runId: string, report: FinancialReport): void {
+  writeJson(`${REPORT_PREFIX}${runId}${SUFFIX}`, report);
 }
 
-export function getCachedTables(runId: string): Record<string, unknown[]> | null {
-  const key = RUN_TABLES_KEY_PREFIX + runId + ':v1';
-  const value = safeGetItem(key);
-  return safeParse<Record<string, unknown[]>>(value);
+export function getCachedTables(runId: string): ReconciliationTables | null {
+  return readJson<ReconciliationTables | null>(`${TABLES_PREFIX}${runId}${SUFFIX}`, null);
 }
 
-export function setCachedTables(runId: string, tables: Record<string, unknown[]>): void {
-  const key = RUN_TABLES_KEY_PREFIX + runId + ':v1';
-  const serialized = safeStringify(tables);
-  if (serialized) {
-    safeSetItem(key, serialized);
-  }
+export function setCachedTables(runId: string, tables: ReconciliationTables): void {
+  writeJson(`${TABLES_PREFIX}${runId}${SUFFIX}`, tables);
 }
 
 export function clearCachedRun(runId: string): void {
-  const detailKey = RUN_DETAIL_KEY_PREFIX + runId + ':v1';
-  const reportKey = RUN_REPORT_KEY_PREFIX + runId + ':v1';
-  const tablesKey = RUN_TABLES_KEY_PREFIX + runId + ':v1';
-  
-  if (typeof window !== 'undefined') {
-    try {
-      window.localStorage.removeItem(detailKey);
-      window.localStorage.removeItem(reportKey);
-      window.localStorage.removeItem(tablesKey);
-    } catch {
-      // ignore
-    }
-  }
-  
-  const current = getCachedRunIndex();
-  const filtered = current.filter((r) => getRunId(r) !== runId);
-  if (filtered.length !== current.length) {
-    const serialized = safeStringify(filtered);
-    if (serialized) {
-      safeSetItem(RUNS_INDEX_KEY, serialized);
-    }
-  }
+  if (!canUseStorage()) return;
+  try {
+    window.localStorage.removeItem(`${DETAIL_PREFIX}${runId}${SUFFIX}`);
+    window.localStorage.removeItem(`${REPORT_PREFIX}${runId}${SUFFIX}`);
+    window.localStorage.removeItem(`${TABLES_PREFIX}${runId}${SUFFIX}`);
+    const next = getCachedRunIndex().filter((run) => getRunId(run) !== runId);
+    writeJson(RUNS_INDEX_KEY, next);
+  } catch {}
+}
+
+export function mergeCachedAndRemoteRuns(remoteRuns: RunSummary[], cachedRuns = getCachedRunIndex()): RunSummary[] {
+  const merged = mergeRuns(remoteRuns, cachedRuns);
+  writeJson(RUNS_INDEX_KEY, merged);
+  return merged;
 }

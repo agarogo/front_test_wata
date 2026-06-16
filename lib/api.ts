@@ -6,7 +6,7 @@ import type {
   HealthResponse,
   OnliPayTransaction,
   ReconciliationRun,
-  RunCounts,
+  ReconciliationTables,
   WataTransaction,
 } from './types';
 
@@ -19,7 +19,8 @@ export type ApiError = {
   url?: string;
 };
 
-type DbCounts = Record<string, number>;
+const rawTimeout = Number(process.env.NEXT_PUBLIC_API_TIMEOUT_MS);
+export const API_TIMEOUT_MS = Number.isFinite(rawTimeout) && rawTimeout >= 3600000 ? rawTimeout : 3600000;
 
 const COMMISSION_STORAGE_KEY = 'onlipay_commission_groups';
 
@@ -30,24 +31,39 @@ const FALLBACK_COMMISSION_GROUPS: CommissionGroup[] = [
   { group_code: 'wata case', label: 'wata case', gateway_point: 'WataCase', commission_rate: '0.08', min_commission: '0', fixed_commission: '0' },
 ];
 
-const rawTimeout = Number(process.env.NEXT_PUBLIC_API_TIMEOUT_MS);
-export const API_TIMEOUT_MS =
-  Number.isFinite(rawTimeout) && rawTimeout >= 3600000
-    ? rawTimeout
-    : 3600000;
-
 function normalizeErrorPayload(payload: unknown, fallback: string): string {
   if (!payload) return fallback;
   if (typeof payload === 'string') return payload;
   if (typeof payload === 'object') {
     const record = payload as Record<string, unknown>;
-    const detail = record.detail;
-    const message = record.message;
-    if (typeof message === 'string') return message;
-    if (typeof detail === 'string') return detail;
-    if (Array.isArray(detail)) return detail.map((item) => JSON.stringify(item)).join('; ');
+    if (typeof record.message === 'string') return record.message;
+    if (typeof record.detail === 'string') return record.detail;
+    if (Array.isArray(record.detail)) return record.detail.map((item) => JSON.stringify(item)).join('; ');
   }
   return fallback;
+}
+
+async function parseResponse<T>(response: Response, url: string): Promise<T> {
+  const text = await response.text();
+  let payload: unknown = null;
+  if (text.trim()) {
+    try {
+      payload = JSON.parse(text);
+    } catch {
+      payload = text;
+    }
+  }
+
+  if (!response.ok) {
+    throw {
+      message: normalizeErrorPayload(payload, `HTTP ${response.status}: ${response.statusText}`),
+      status: response.status,
+      detail: payload,
+      url,
+    } satisfies ApiError;
+  }
+
+  return (payload ?? {}) as T;
 }
 
 async function apiFetch<T>(url: string, options?: RequestInit, timeout = API_TIMEOUT_MS): Promise<T> {
@@ -56,58 +72,19 @@ async function apiFetch<T>(url: string, options?: RequestInit, timeout = API_TIM
   const fullUrl = `${API_BASE_URL}${url}`;
 
   try {
-    const response = await fetch(fullUrl, {
-      ...options,
-      signal: controller.signal,
-      headers: options?.body instanceof FormData
-        ? options.headers
-        : { 'Content-Type': 'application/json', ...(options?.headers || {}) },
-    });
-
-    const text = await response.text();
-    let payload: unknown = null;
-    if (text.trim()) {
-      try {
-        payload = JSON.parse(text);
-      } catch {
-        payload = text;
-      }
-    }
-
-    if (!response.ok) {
-      throw {
-        message: normalizeErrorPayload(payload, `HTTP ${response.status}: ${response.statusText}`),
-        status: response.status,
-        detail: payload,
-        url,
-      } satisfies ApiError;
-    }
-
-    return (payload ?? {}) as T;
+    const headers = options?.body instanceof FormData
+      ? options.headers
+      : { 'Content-Type': 'application/json', ...(options?.headers || {}) };
+    const response = await fetch(fullUrl, { ...options, signal: controller.signal, headers });
+    return await parseResponse<T>(response, url);
   } catch (error) {
     if (error instanceof Error && error.name === 'AbortError') {
-      throw { message: `Таймаут запроса. API не ответил за ${Math.round(API_TIMEOUT_MS / 60000)} минут.`, status: 408, url } satisfies ApiError;
+      throw { message: `Запрос выполнялся слишком долго. Таймаут: ${Math.round(API_TIMEOUT_MS / 60000)} минут.`, status: 408, url } satisfies ApiError;
     }
     throw error;
   } finally {
     clearTimeout(timeoutId);
   }
-}
-
-async function apiFetchFirst<T>(urls: string[], options?: RequestInit, emptyFallback?: T): Promise<T> {
-  let lastError: unknown = null;
-  for (const url of urls) {
-    try {
-      return await apiFetch<T>(url, options);
-    } catch (error) {
-      const status = (error as ApiError)?.status;
-      lastError = error;
-      if (status === 404 || status === 405 || status === 501) continue;
-      throw error;
-    }
-  }
-  if (emptyFallback !== undefined) return emptyFallback;
-  throw lastError || { message: 'Не найден рабочий API endpoint' };
 }
 
 function asArray<T>(value: unknown): T[] {
@@ -133,7 +110,9 @@ function readStoredCommissionGroups(): CommissionGroup[] {
 
 function writeStoredCommissionGroups(groups: CommissionGroup[]) {
   if (typeof window === 'undefined') return;
-  window.localStorage.setItem(COMMISSION_STORAGE_KEY, JSON.stringify(groups));
+  try {
+    window.localStorage.setItem(COMMISSION_STORAGE_KEY, JSON.stringify(groups));
+  } catch {}
 }
 
 function normalizeCommissionGroup(item: CommissionGroup): CommissionGroup {
@@ -149,33 +128,52 @@ function normalizeCommissionGroup(item: CommissionGroup): CommissionGroup {
   };
 }
 
-export function getRunId(run: Pick<ReconciliationRun, 'id' | 'run_id'> | null | undefined): string {
+export function getRunId(run: { id?: string | number; run_id?: string | number } | null | undefined): string {
   return String(run?.id ?? run?.run_id ?? '');
 }
 
+function normalizeCreatedRun(result: Record<string, unknown>, input: Partial<ExcelRunFormInput> = {}): ReconciliationRun {
+  const id = String(result.run_id ?? result.id ?? '');
+  const financialReport = result.financial_report && typeof result.financial_report === 'object'
+    ? result.financial_report as Record<string, unknown>
+    : undefined;
+  return {
+    ...result,
+    id,
+    run_id: id,
+    status: String(result.status ?? 'calculated'),
+    period_start: String(result.period_start ?? financialReport?.period_start ?? input.period_start ?? ''),
+    period_end: String(result.period_end ?? financialReport?.period_end ?? input.period_end ?? ''),
+    created_at: String(result.created_at ?? new Date().toISOString()),
+  } as ReconciliationRun;
+}
+
 export async function getHealth(): Promise<HealthResponse> {
-  return apiFetchFirst<HealthResponse>(['/health', '/api/health']);
+  return apiFetch<HealthResponse>('/health');
 }
 
 export async function getRuns(): Promise<ReconciliationRun[]> {
   try {
-    const data = await apiFetchFirst<unknown>(['/reconciliation-runs', '/api/reconciliation-runs'], undefined, []);
+    const data = await apiFetch<unknown>('/reconciliation-runs');
     return asArray<ReconciliationRun>(data);
-  } catch {
+  } catch (error) {
+    const status = (error as ApiError)?.status;
+    if (status === 404 || status === 405 || status === 501) return [];
     return [];
   }
 }
 
 export async function createRun(payload: CreateReconciliationRunRequest): Promise<ReconciliationRun> {
-  return apiFetchFirst<ReconciliationRun>(['/reconciliation-runs/', '/api/reconciliation-runs/'], {
+  const result = await apiFetch<Record<string, unknown>>('/reconciliation-runs/', {
     method: 'POST',
     body: JSON.stringify(payload),
   });
+  return normalizeCreatedRun(result, payload);
 }
 
 export async function createRunFromExcel(input: ExcelRunFormInput): Promise<ReconciliationRun> {
   const formData = new FormData();
-  formData.append('file', input.file);
+  if (input.file) formData.append('file', input.file);
   formData.append('period_start', input.period_start);
   formData.append('period_end', input.period_end);
   formData.append('fx_rate', String(input.fx_rate));
@@ -183,80 +181,50 @@ export async function createRunFromExcel(input: ExcelRunFormInput): Promise<Reco
   formData.append('gateway_final_rub_amount', String(input.gateway_final_rub_amount));
   formData.append('conversion_commission_rate', String(input.conversion_commission_rate ?? '0'));
   formData.append('conversion_commission_amount', String(input.conversion_commission_amount ?? '0'));
-  formData.append('wata_base_rub_amount', String(input.wata_base_rub_amount ?? '0'));
-  formData.append('wata_131_rub_amount', String(input.wata_131_rub_amount ?? '0'));
-  formData.append('wata_adult_rub_amount', String(input.wata_adult_rub_amount ?? '0'));
-  formData.append('wata_case_rub_amount', String(input.wata_case_rub_amount ?? '0'));
+  if (input.wata_base_rub_amount !== undefined) formData.append('wata_base_rub_amount', String(input.wata_base_rub_amount));
+  if (input.wata_131_rub_amount !== undefined) formData.append('wata_131_rub_amount', String(input.wata_131_rub_amount));
+  if (input.wata_adult_rub_amount !== undefined) formData.append('wata_adult_rub_amount', String(input.wata_adult_rub_amount));
+  if (input.wata_case_rub_amount !== undefined) formData.append('wata_case_rub_amount', String(input.wata_case_rub_amount));
 
-  const result = await apiFetchFirst<Record<string, unknown>>(['/reconciliation-runs/from-excel', '/api/reconciliation-runs/from-excel'], {
+  const result = await apiFetch<Record<string, unknown>>('/reconciliation-runs/from-excel', {
     method: 'POST',
     body: formData,
-  }, {});
-
-  return {
-    ...result,
-    id: String(result.id ?? result.run_id ?? ''),
-    run_id: String(result.run_id ?? result.id ?? ''),
-    status: String(result.status ?? 'calculated'),
-    period_start: input.period_start,
-    period_end: input.period_end,
-    created_at: new Date().toISOString(),
-  } as ReconciliationRun;
+  });
+  return normalizeCreatedRun(result, input);
 }
 
 export async function getRun(runId: string): Promise<ReconciliationRun> {
-  return apiFetchFirst<ReconciliationRun>([`/reconciliation-runs/${runId}`, `/api/reconciliation-runs/${runId}`]);
+  return apiFetch<ReconciliationRun>(`/reconciliation-runs/${encodeURIComponent(runId)}`);
 }
 
-export async function getDbCounts(): Promise<DbCounts> {
-  return apiFetchFirst<DbCounts>(['/reconciliation-runs/db/counts', '/api/reconciliation-runs/db/counts'], undefined, {});
-}
-
-export async function getRunCounts(runId: string): Promise<RunCounts | null> {
+export async function getDbCounts(): Promise<Record<string, number>> {
   try {
-    const tables = await getTables(runId);
-    const onlipay = tables.onlipay_payments;
-    let onlipayCount = 0;
-    if (Array.isArray(onlipay)) onlipayCount = onlipay.length;
-    if (onlipay && typeof onlipay === 'object' && !Array.isArray(onlipay)) {
-      onlipayCount = Object.values(onlipay as Record<string, unknown[]>).reduce((sum, rows) => sum + (Array.isArray(rows) ? rows.length : 0), 0);
-    }
-    return {
-      total: (Array.isArray(tables.wata_payments) ? tables.wata_payments.length : 0) + onlipayCount,
-      wata_transactions_count: Array.isArray(tables.wata_payments) ? tables.wata_payments.length : 0,
-      onlipay_transactions_count: onlipayCount,
-      discrepancies_count: Array.isArray(tables.amount_commission_discrepancies) ? tables.amount_commission_discrepancies.length : 0,
-      missing_in_wata: Array.isArray(tables.gateway_missing_in_wata_current) ? tables.gateway_missing_in_wata_current.length : 0,
-      missing_in_onlipay: Array.isArray(tables.wata_missing_in_gateway_current) ? tables.wata_missing_in_gateway_current.length : 0,
-    };
+    return await apiFetch<Record<string, number>>('/reconciliation-runs/db/counts');
   } catch {
-    return null;
+    return {};
   }
 }
 
 export async function uploadWataPayments(runId: string, transactions: WataTransaction[]) {
-  return apiFetchFirst([`/reconciliation-runs/${runId}/wata/payments`, `/api/reconciliation-runs/${runId}/wata/payments`], {
+  return apiFetch(`/reconciliation-runs/${encodeURIComponent(runId)}/wata/payments`, {
     method: 'POST',
     body: JSON.stringify(transactions),
   });
 }
 
 export async function uploadOnliPayPayments(runId: string, group: string, transactions: OnliPayTransaction[]) {
-  return apiFetchFirst([
-    `/reconciliation-runs/${runId}/onlipay/${encodeURIComponent(group)}/payments`,
-    `/api/reconciliation-runs/${runId}/onlipay/${encodeURIComponent(group)}/payments`,
-  ], {
+  return apiFetch(`/reconciliation-runs/${encodeURIComponent(runId)}/onlipay/${encodeURIComponent(group)}/payments`, {
     method: 'POST',
     body: JSON.stringify(transactions),
   });
 }
 
 export async function calculateRun(runId: string) {
-  return apiFetchFirst([`/reconciliation-runs/${runId}/calculate`, `/api/reconciliation-runs/${runId}/calculate`], { method: 'POST' });
+  return apiFetch(`/reconciliation-runs/${encodeURIComponent(runId)}/calculate`, { method: 'POST' });
 }
 
 export async function acceptRun(runId: string) {
-  return apiFetchFirst([`/reconciliation-runs/${runId}/accept`, `/api/reconciliation-runs/${runId}/accept`], { method: 'POST' });
+  return apiFetch(`/reconciliation-runs/${encodeURIComponent(runId)}/accept`, { method: 'POST' });
 }
 
 export async function deleteRun(runId: string) {
@@ -265,11 +233,11 @@ export async function deleteRun(runId: string) {
 }
 
 export async function getReport(runId: string): Promise<FinancialReport> {
-  return apiFetchFirst<FinancialReport>([`/reconciliation-runs/${runId}/report`, `/api/reconciliation-runs/${runId}/report`]);
+  return apiFetch<FinancialReport>(`/reconciliation-runs/${encodeURIComponent(runId)}/report`);
 }
 
-export async function getTables(runId: string): Promise<Record<string, unknown>> {
-  return apiFetchFirst<Record<string, unknown>>([`/reconciliation-runs/${runId}/tables`, `/api/reconciliation-runs/${runId}/tables`], undefined, {});
+export async function getTables(runId: string): Promise<ReconciliationTables> {
+  return apiFetch<ReconciliationTables>(`/reconciliation-runs/${encodeURIComponent(runId)}/tables`);
 }
 
 export async function getCommissionGroups(): Promise<CommissionGroup[]> {
@@ -277,7 +245,7 @@ export async function getCommissionGroups(): Promise<CommissionGroup[]> {
   if (stored.length) return stored.map(normalizeCommissionGroup);
 
   try {
-    const data = await apiFetchFirst<unknown>(['/reference/onlipay-commission-rates'], undefined, []);
+    const data = await apiFetch<unknown>('/reference/onlipay-commission-rates', { method: 'POST', body: JSON.stringify({}) });
     const fromApi = asArray<CommissionGroup>(data).map(normalizeCommissionGroup);
     return fromApi.length ? fromApi : FALLBACK_COMMISSION_GROUPS;
   } catch {

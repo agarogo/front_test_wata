@@ -1,10 +1,10 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { getRuns, getRunId } from '../../../lib/api';
-import { getCachedRunIndex, upsertCachedRuns } from '../../../lib/run-cache';
+import { useRouter } from 'next/navigation';
+import { getRuns } from '../../../lib/api';
+import { getCachedRunIndex, getRunId, mergeCachedAndRemoteRuns } from '../../../lib/run-cache';
 import type { ReconciliationRun } from '../../../lib/types';
 import ApiErrorAlert from '../../../components/ApiErrorAlert';
 import EmptyState from '../../../components/EmptyState';
@@ -19,42 +19,20 @@ function formatDate(value?: string) {
 export default function HistoryPage() {
   const router = useRouter();
   const [runs, setRuns] = useState<ReconciliationRun[]>([]);
+  const [manualId, setManualId] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<unknown>(null);
-  const [runIdInput, setRunIdInput] = useState('');
 
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
+    const cached = getCachedRunIndex();
+    setRuns(cached);
     try {
-      const cached = getCachedRunIndex();
-      setRuns(cached);
-      
       const remote = await getRuns();
-      
-      const mergedMap = new Map<string, ReconciliationRun>();
-      
-      for (const run of cached) {
-        const id = getRunId(run);
-        if (id) mergedMap.set(id, run);
-      }
-      
-      for (const run of remote) {
-        const id = getRunId(run);
-        if (id) mergedMap.set(id, run);
-      }
-      
-      const merged = Array.from(mergedMap.values()).sort((a, b) => {
-        const aTime = new Date(a.created_at || 0).getTime();
-        const bTime = new Date(b.created_at || 0).getTime();
-        return bTime - aTime;
-      });
-      
-      setRuns(merged);
-      upsertCachedRuns(merged);
+      setRuns(mergeCachedAndRemoteRuns(remote, cached));
     } catch (err) {
       setError(err);
-      const cached = getCachedRunIndex();
       setRuns(cached);
     } finally {
       setLoading(false);
@@ -66,36 +44,31 @@ export default function HistoryPage() {
     return () => window.clearTimeout(timer);
   }, [load]);
 
-  function handleOpenRun() {
-    const id = runIdInput.trim();
-    if (id) {
-      router.push(`/reconciliation/${encodeURIComponent(id)}`);
-    }
+  function openManualRun() {
+    const id = manualId.trim();
+    if (id) router.push(`/reconciliation/${encodeURIComponent(id)}`);
   }
 
   return (
     <div className="page">
       <div className="page-header">
-        <div><div className="page-eyebrow">История</div><h1>Запуски сверки</h1><p>Список созданных запусков и быстрые действия.</p></div>
+        <div><div className="page-eyebrow">История</div><h1>Запуски сверки</h1><p>Список запусков из кеша браузера и backend, если список доступен.</p></div>
         <Link className="btn" href="/reconciliation/new">Новая сверка</Link>
       </div>
-      {error ? <ApiErrorAlert error={error} title="API истории недоступен" onRetry={load} /> : null}
+      {error && runs.length === 0 ? <ApiErrorAlert error={error} title="API истории недоступен" onRetry={load} /> : null}
+
       <div className="card">
-        <div className="form-field" style={{ marginBottom: '1rem' }}>
-          <label>ID запуска</label>
-          <div style={{ display: 'flex', gap: '0.5rem' }}>
-            <input 
-              type="text" 
-              value={runIdInput} 
-              onChange={(e) => setRunIdInput(e.target.value)}
-              placeholder="Введите ID запуска"
-              style={{ flex: 1 }}
-            />
-            <button className="btn btn-secondary" onClick={handleOpenRun}>Открыть</button>
-          </div>
+        <div className="card-header"><div className="card-title">Открыть по ID</div></div>
+        <div className="actions">
+          <input style={{ maxWidth: 360 }} placeholder="ID запуска" value={manualId} onChange={(event) => setManualId(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') openManualRun(); }} />
+          <button className="btn" type="button" onClick={openManualRun}>Открыть</button>
+          <button className="btn btn-secondary" type="button" onClick={load}>Обновить</button>
         </div>
-        {loading ? <LoadingState label="Загрузка истории..." /> : runs.length === 0 ? (
-          <EmptyState title="История пустая" description="Создай первый запуск сверки." action={<Link className="btn" href="/reconciliation/new">Создать</Link>} />
+      </div>
+
+      <div className="card">
+        {loading && runs.length === 0 ? <LoadingState label="Загрузка истории..." /> : runs.length === 0 ? (
+          <EmptyState title="История пустая" description="Создай первый запуск или открой существующий запуск по ID." action={<Link className="btn" href="/reconciliation/new">Создать</Link>} />
         ) : (
           <div className="table-container">
             <table>

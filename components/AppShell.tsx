@@ -2,12 +2,14 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import BackendStatus from './BackendStatus';
 
 const navItems = [
   { href: '/', label: 'Обзор' },
   { href: '/reconciliation/new', label: 'Новая сверка' },
   { href: '/reconciliation/history', label: 'История' },
   { href: '/reference/commissions', label: 'Комиссии' },
+  { href: '/database', label: 'БД' },
 ];
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
@@ -38,7 +40,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         <header className="top-bar">
           <div>
             <strong>Сверка WATA ↔ OnliPay</strong>
-            <span>API: http://10.129.0.9:5050</span>
+            <BackendStatus />
           </div>
         </header>
         <div className="content-area">{children}</div>

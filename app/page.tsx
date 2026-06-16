@@ -2,8 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { getHealth, getRuns, getRunId } from '../lib/api';
-import { getCachedRunIndex, upsertCachedRuns } from '../lib/run-cache';
+import { getHealth, getRuns } from '../lib/api';
+import { getCachedRunIndex, getRunId, mergeCachedAndRemoteRuns } from '../lib/run-cache';
 import type { HealthResponse, ReconciliationRun } from '../lib/types';
 import ApiErrorAlert from '../components/ApiErrorAlert';
 import EmptyState from '../components/EmptyState';
@@ -24,34 +24,13 @@ export default function DashboardPage() {
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
+    const cached = getCachedRunIndex();
+    setRuns(cached);
     try {
       const [healthResult, apiRuns] = await Promise.allSettled([getHealth(), getRuns()]);
       if (healthResult.status === 'fulfilled') setHealth(healthResult.value);
-      
-      const cached = getCachedRunIndex();
       const remoteRuns = apiRuns.status === 'fulfilled' ? apiRuns.value : [];
-      
-      const mergedMap = new Map<string, ReconciliationRun>();
-      
-      for (const run of cached) {
-        const id = getRunId(run);
-        if (id) mergedMap.set(id, run);
-      }
-      
-      for (const run of remoteRuns) {
-        const id = getRunId(run);
-        if (id) mergedMap.set(id, run);
-      }
-      
-      const merged = Array.from(mergedMap.values()).sort((a, b) => {
-        const aTime = new Date(a.created_at || 0).getTime();
-        const bTime = new Date(b.created_at || 0).getTime();
-        return bTime - aTime;
-      });
-      
-      setRuns(merged);
-      upsertCachedRuns(merged);
-      
+      setRuns(mergeCachedAndRemoteRuns(remoteRuns, cached));
       if (healthResult.status === 'rejected') setError(healthResult.reason);
     } finally {
       setLoading(false);
@@ -66,7 +45,7 @@ export default function DashboardPage() {
   const stats = useMemo(() => ({
     total: runs.length,
     done: runs.filter((r) => ['accepted', 'calculated', 'completed'].includes(String(r.status))).length,
-    processing: runs.filter((r) => ['draft', 'data_loaded', 'processing', 'loaded', 'pending'].includes(String(r.status))).length,
+    processing: runs.filter((r) => ['pending', 'draft', 'data_loaded', 'processing', 'loaded'].includes(String(r.status))).length,
     failed: runs.filter((r) => String(r.status).includes('fail')).length,
   }), [runs]);
 
@@ -75,12 +54,13 @@ export default function DashboardPage() {
       <div className="page-header">
         <div>
           <div className="page-eyebrow">Operator dashboard</div>
-          <h1>OnliPay Reconciliation</h1>
-          <p>Сверка WATA ↔ OnliPay: создание запуска, загрузка данных, расчёт, отчёт и принятие результата.</p>
+          <h1>OnliPay/WATA Reconciliation</h1>
+          <p>Загрузка Excel, расчёт сверки из БД, отчёты и промежуточные таблицы.</p>
         </div>
         <div className="actions">
           <Link className="btn" href="/reconciliation/new">Новая сверка</Link>
-          <Link className="btn btn-secondary" href="/reconciliation/history">История</Link>
+          <Link className="btn btn-secondary" href="/reconciliation/history">История/проверка БД</Link>
+          <Link className="btn btn-secondary" href="/database">БД</Link>
         </div>
       </div>
 
@@ -94,43 +74,39 @@ export default function DashboardPage() {
       <div className="card">
         <div className="card-header">
           <div>
-            <div className="card-title">API</div>
-            <div className="card-subtitle">{health?.version || '—'} • {health?.status || '—'}</div>
+            <div className="card-title">Backend status</div>
+            <p>{health?.status === 'healthy' ? 'Backend online' : 'Backend unavailable. Check server or NEXT_PUBLIC_API_BASE_URL.'}</p>
           </div>
-          <button className="btn btn-secondary" onClick={load} disabled={loading}>Обновить</button>
+          <StatusBadge status={health?.status === 'healthy' ? 'completed' : 'failed'} />
         </div>
-        {loading && runs.length === 0 ? <LoadingState label="Загрузка запусков..." /> : error ? (
-          <ApiErrorAlert error={error} title="Ошибка загрузки" onRetry={load} />
-        ) : runs.length ? (
+        {error ? <ApiErrorAlert error={error} title="API недоступен" onRetry={load} /> : null}
+      </div>
+
+      <div className="card">
+        <div className="card-header">
+          <div className="card-title">Последние запуски</div>
+          <Link className="btn btn-secondary" href="/reconciliation/history">Открыть историю</Link>
+        </div>
+        {loading && runs.length === 0 ? <LoadingState label="Загрузка запусков..." /> : runs.length === 0 ? (
+          <EmptyState title="Пока нет запусков" description="Создай новую сверку, после этого запуск появится в списке." action={<Link className="btn" href="/reconciliation/new">Создать сверку</Link>} />
+        ) : (
           <div className="table-container">
             <table>
-              <thead>
-                <tr>
-                  <th>ID</th>
-                  <th>Период</th>
-                  <th>Статус</th>
-                  <th>Создан</th>
-                  <th>Действия</th>
-                </tr>
-              </thead>
+              <thead><tr><th>ID</th><th>Статус</th><th>Период</th><th>Создан</th><th>Действия</th></tr></thead>
               <tbody>
-                {runs.map((run) => {
+                {runs.slice(0, 6).map((run) => {
                   const id = getRunId(run);
-                  return (
-                    <tr key={id}>
-                      <td><Link href={`/reconciliation/${id}`}>{id.length > 8 ? id.slice(0, 8) : id}</Link></td>
-                      <td>{run.period_start || '—'} — {run.period_end || '—'}</td>
-                      <td><StatusBadge status={run.status} /></td>
-                      <td>{formatDate(run.created_at)}</td>
-                      <td><Link className="btn btn-secondary" href={`/reconciliation/${id}`}>Открыть</Link></td>
-                    </tr>
-                  );
+                  return <tr key={id}>
+                    <td className="key-field">{id.slice(0, 8)}</td>
+                    <td><StatusBadge status={run.status} /></td>
+                    <td>{run.period_start || '—'} — {run.period_end || '—'}</td>
+                    <td>{formatDate(run.created_at)}</td>
+                    <td><Link className="btn btn-secondary" href={`/reconciliation/${id}`}>Открыть</Link></td>
+                  </tr>;
                 })}
               </tbody>
             </table>
           </div>
-        ) : (
-          <EmptyState title="Нет запусков" description="Создайте первую сверку." />
         )}
       </div>
     </div>

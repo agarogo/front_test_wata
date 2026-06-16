@@ -62,7 +62,7 @@ export default function UploadPage({ params }: { params: Promise<{ run_id: strin
         <div>
           <div className="page-eyebrow">Загрузка данных</div>
           <h1>Запуск {runId.slice(0, 8)}</h1>
-          <p>Добавь данные WATA и OnliPay для выбранного запуска.</p>
+          <p>Вставьте массив объектов для WATA или OnliPay и загрузите данные.</p>
         </div>
         <div className="actions">
           <Link className="btn btn-secondary" href={`/reconciliation/${runId}`}>К запуску</Link>

@@ -11,6 +11,50 @@ export interface HealthResponse {
   status?: string;
   service?: string;
   version?: string;
+  timestamp?: string;
+}
+
+export type DataSource = 'excel_upload' | 'linked_run' | 'database_period' | string;
+
+export type ParsedCounts = {
+  wata_payments?: number;
+  carry_over_payments?: number;
+  onlipay_wata_base?: number;
+  onlipay_wata_131?: number;
+  onlipay_wata_adult?: number;
+  onlipay_wata_case?: number;
+  gateway_refunds?: number;
+  chargebacks?: number;
+  [key: string]: number | undefined;
+};
+
+export type DbCounts = {
+  reconciliation_runs?: number;
+  wata_transactions?: number;
+  onlipay_transactions?: number;
+  run_items?: number;
+  [key: string]: number | undefined;
+};
+
+export interface FinancialReport {
+  run_id?: string;
+  period_start?: string;
+  period_end?: string;
+  fx_rate?: string | number;
+  gateway_usdt_amount?: string | number;
+  conversion_commission_amount?: string | number;
+  amount_8_1?: string | number;
+  gateway_missing_in_wata_current?: string | number;
+  gateway_missing_in_wata_current_total?: string | number;
+  wata_missing_in_gateway_current?: string | number;
+  wata_missing_in_gateway_current_total?: string | number;
+  amount_commission_discrepancies_total?: string | number;
+  preliminary_rub_amount?: string | number;
+  final_rub_amount?: string | number;
+  calculated_usdt_amount?: string | number;
+  usdt_difference?: string | number;
+  discrepancies_count?: number;
+  [key: string]: unknown;
 }
 
 export interface ReconciliationRun {
@@ -21,6 +65,8 @@ export interface ReconciliationRun {
   period_end?: string;
   created_at?: string;
   updated_at?: string;
+  data_source?: DataSource;
+  source_run_id?: string | null;
   gateway_final_rub_amount?: string | number;
   fx_rate?: string | number;
   gateway_usdt_amount?: string | number;
@@ -29,16 +75,31 @@ export interface ReconciliationRun {
   final_rub_amount?: string | number;
   preliminary_rub_amount?: string | number;
   discrepancies_count?: number;
-  parsed_counts?: Record<string, number>;
-  db_counts?: Record<string, number>;
+  parsed_counts?: ParsedCounts;
+  db_counts?: DbCounts;
   financial_report?: FinancialReport;
-  missing_counts?: Record<string, number>;
+  missing_counts?: Record<string, unknown>;
   report_downloads?: { xlsx?: string; txt?: string };
   warnings?: string[];
+  [key: string]: unknown;
 }
 
 export type RunSummary = ReconciliationRun;
 export type RunDetail = ReconciliationRun;
+
+export interface ReconciliationUploadResponse extends ReconciliationRun {
+  run_id: string;
+  status: string;
+  data_source?: DataSource;
+  source_run_id?: string | null;
+  parsed_counts?: ParsedCounts;
+  db_counts?: DbCounts;
+  financial_report?: FinancialReport;
+  missing_counts?: Record<string, unknown>;
+  discrepancies_count?: number;
+  report_downloads?: { xlsx?: string; txt?: string };
+  warnings?: string[];
+}
 
 export interface RunCounts {
   total?: number;
@@ -47,6 +108,11 @@ export interface RunCounts {
   unmatched_onlipay?: number;
   wata_transactions_count?: number;
   onlipay_transactions_count?: number;
+  carry_over_count?: number;
+  onlipay_base_count?: number;
+  onlipay_131_count?: number;
+  onlipay_adult_count?: number;
+  onlipay_case_count?: number;
   matched_count?: number;
   discrepancies_count?: number;
   missing_in_wata?: number;
@@ -65,7 +131,7 @@ export interface CreateReconciliationRunRequest {
 }
 
 export interface ExcelRunFormInput {
-  file: File;
+  file?: File | null;
   period_start: string;
   period_end: string;
   gateway_final_rub_amount: string | number;
@@ -122,26 +188,8 @@ export interface OnliPayTransaction {
   [key: string]: unknown;
 }
 
-export interface FinancialReport {
-  run_id?: string;
-  period_start?: string;
-  period_end?: string;
-  amount_8_1?: string | number;
-  gateway_missing_in_wata_current?: string | number;
-  gateway_missing_in_wata_current_total?: string | number;
-  wata_missing_in_gateway_current?: string | number;
-  wata_missing_in_gateway_current_total?: string | number;
-  amount_commission_discrepancies_total?: string | number;
-  preliminary_rub_amount?: string | number;
-  conversion_commission_amount?: string | number;
-  final_rub_amount?: string | number;
-  fx_rate?: string | number;
-  calculated_usdt_amount?: string | number;
-  gateway_usdt_amount?: string | number;
-  usdt_difference?: string | number;
-  discrepancies_count?: number;
-  [key: string]: unknown;
-}
+export type ReconciliationTables = Record<string, unknown>;
+export type RunTables = Record<string, unknown>;
 
 export interface CommissionGroup {
   group_code?: string;
