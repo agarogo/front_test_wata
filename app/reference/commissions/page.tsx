@@ -81,8 +81,8 @@ export default function CommissionsPage() {
           <p>Ставки для групп, используемых в сверке.</p>
         </div>
         <div className="actions">
-          <button className="btn btn-secondary" onClick={load}>Обновить</button>
-          <button className="btn btn-ghost" onClick={reset}>Сбросить</button>
+          <button className="btn btn-primary" onClick={load}>Обновить</button>
+          <button className="btn btn-primary" onClick={reset}>Сбросить</button>
         </div>
       </div>
 
@@ -102,7 +102,7 @@ export default function CommissionsPage() {
                 <td><input value={String(draft.commission_rate ?? getRate(group))} onChange={(e) => updateDraft(code, 'commission_rate', e.target.value)} /></td>
                 <td><input value={String(draft.min_commission ?? getMinCommission(group))} onChange={(e) => updateDraft(code, 'min_commission', e.target.value)} /></td>
                 <td><input value={String(draft.fixed_commission ?? getFixedCommission(group))} onChange={(e) => updateDraft(code, 'fixed_commission', e.target.value)} /></td>
-                <td><button className="btn btn-secondary" onClick={() => save(group)} disabled={savingCode === code}>{savingCode === code ? 'Сохранение...' : 'Сохранить'}</button></td>
+                <td><button className="btn btn-primary" onClick={() => save(group)} disabled={savingCode === code}>{savingCode === code ? 'Сохранение...' : 'Сохранить'}</button></td>
               </tr>;
             })}
           </tbody></table></div>

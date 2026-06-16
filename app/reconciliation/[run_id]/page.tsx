@@ -143,9 +143,9 @@ export default function RunDetailPage({ params }: { params: Promise<{ run_id: st
           <p>Результат расчёта, отчёты, таблицы и принятие сверки.</p>
         </div>
         <div className="actions">
-          <button className="btn btn-secondary" onClick={() => void load(false)} disabled={refreshing}>{refreshing ? 'Обновляю...' : 'Обновить'}</button>
-          <Link className="btn btn-secondary" href="/reconciliation/history">История</Link>
-          <Link className="btn" href={`/reconciliation/${runId}/tables`}>Открыть таблицы</Link>
+          <button className="btn btn-primary" onClick={() => void load(false)} disabled={refreshing}>{refreshing ? 'Обновляю...' : 'Обновить'}</button>
+          <Link className="btn btn-primary" href="/reconciliation/history">История</Link>
+          <Link className="btn btn-primary" href={`/reconciliation/${runId}/tables`}>Открыть таблицы</Link>
         </div>
       </div>
 
@@ -185,11 +185,11 @@ export default function RunDetailPage({ params }: { params: Promise<{ run_id: st
         <div className="card">
           <div className="card-header"><div className="card-title">Действия</div></div>
           <div className="actions">
-            {canCalculate ? <button className="btn" onClick={handleCalculate} disabled={actionLoading}>Запустить расчёт</button> : null}
-            {canAccept ? <button className="btn btn-secondary" onClick={handleAccept} disabled={actionLoading}>Принять сверку</button> : null}
+            {canCalculate ? <button className="btn btn-primary" onClick={handleCalculate} disabled={actionLoading}>Запустить расчёт</button> : null}
+            {canAccept ? <button className="btn btn-success" onClick={handleAccept} disabled={actionLoading}>Принять сверку</button> : null}
             {status === 'accepted' ? <span className="badge badge-success">Принято</span> : null}
-            <a className="btn btn-secondary" href={getReportXlsxUrl(runId)}>Скачать Excel отчёт</a>
-            <a className="btn btn-secondary" href={getReportTxtUrl(runId)}>Скачать TXT отчёт</a>
+            <a className="btn btn-dark" href={getReportXlsxUrl(runId)}>Скачать Excel отчёт</a>
+            <a className="btn btn-dark" href={getReportTxtUrl(runId)}>Скачать TXT отчёт</a>
             <Link className="btn btn-secondary" href={`/reconciliation/${runId}/report`}>Открыть отчёт</Link>
             <Link className="btn btn-secondary" href={`/reconciliation/${runId}/tables`}>Открыть таблицы</Link>
           </div>

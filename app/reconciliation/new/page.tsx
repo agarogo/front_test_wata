@@ -99,7 +99,7 @@ export default function NewReconciliationPage() {
           <h1>Создать расчёт</h1>
           <p>Заполни период и суммы. Можно загрузить Excel или посчитать по данным в БД.</p>
         </div>
-        <Link className="btn btn-secondary" href="/reconciliation/history">История</Link>
+        <Link className="btn btn-primary" href="/reconciliation/history">История</Link>
       </div>
 
       {error ? <ApiErrorAlert error={error} title="Не удалось создать запуск" /> : null}
@@ -161,7 +161,7 @@ export default function NewReconciliationPage() {
           </div>
         </div>
 
-        <div className="actions"><button className="btn" disabled={saving}>{saving ? 'Запускаю...' : 'Запустить сверку'}</button></div>
+        <div className="actions"><button className="btn btn-primary" disabled={saving}>{saving ? 'Запускаю...' : 'Запустить сверку'}</button></div>
       </form>
     </div>
   );

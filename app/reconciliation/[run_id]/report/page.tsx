@@ -58,8 +58,8 @@ export default function ReportPage({ params }: { params: Promise<{ run_id: strin
         </div>
         <div className="actions">
           <button className="btn btn-secondary" onClick={() => void load(false)} disabled={refreshing}>{refreshing ? 'Обновляю...' : 'Обновить отчёт'}</button>
-          <a className="btn" href={getReportXlsxUrl(runId)}>Скачать Excel отчёт</a>
-          <a className="btn btn-secondary" href={getReportTxtUrl(runId)}>Скачать TXT отчёт</a>
+          <a className="btn btn-dark" href={getReportXlsxUrl(runId)}>Скачать Excel отчёт</a>
+          <a className="btn btn-dark" href={getReportTxtUrl(runId)}>Скачать TXT отчёт</a>
           <Link className="btn btn-secondary" href={`/reconciliation/${runId}`}>К запуску</Link>
         </div>
       </div>

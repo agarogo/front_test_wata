@@ -47,7 +47,7 @@ export default function DatabasePage() {
           <h1>Проверка БД</h1>
           <p>Количество сохранённых записей в таблицах backend.</p>
         </div>
-        <button className="btn btn-secondary" onClick={load}>Обновить</button>
+        <button className="btn btn-primary" onClick={load}>Обновить</button>
       </div>
 
       {error ? <ApiErrorAlert error={error} title="Ошибка загрузки DB counts" onRetry={load} /> : null}

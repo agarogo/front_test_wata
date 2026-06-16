@@ -53,7 +53,7 @@ export default function HistoryPage() {
     <div className="page">
       <div className="page-header">
         <div><div className="page-eyebrow">История</div><h1>Запуски сверки</h1><p>Список запусков из кеша браузера и backend, если список доступен.</p></div>
-        <Link className="btn" href="/reconciliation/new">Новая сверка</Link>
+        <Link className="btn btn-primary" href="/reconciliation/new">Новая сверка</Link>
       </div>
       {error && runs.length === 0 ? <ApiErrorAlert error={error} title="API истории недоступен" onRetry={load} /> : null}
 
@@ -61,14 +61,14 @@ export default function HistoryPage() {
         <div className="card-header"><div className="card-title">Открыть по ID</div></div>
         <div className="actions">
           <input style={{ maxWidth: 360 }} placeholder="ID запуска" value={manualId} onChange={(event) => setManualId(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') openManualRun(); }} />
-          <button className="btn" type="button" onClick={openManualRun}>Открыть</button>
-          <button className="btn btn-secondary" type="button" onClick={load}>Обновить</button>
+          <button className="btn btn-primary" type="button" onClick={openManualRun}>Открыть</button>
+          <button className="btn btn-primary" type="button" onClick={load}>Обновить</button>
         </div>
       </div>
 
       <div className="card">
         {loading && runs.length === 0 ? <LoadingState label="Загрузка истории..." /> : runs.length === 0 ? (
-          <EmptyState title="История пустая" description="Создай первый запуск или открой существующий запуск по ID." action={<Link className="btn" href="/reconciliation/new">Создать</Link>} />
+          <EmptyState title="История пустая" description="Создай первый запуск или открой существующий запуск по ID." action={<Link className="btn btn-primary" href="/reconciliation/new">Создать</Link>} />
         ) : (
           <div className="table-container">
             <table>
@@ -82,9 +82,9 @@ export default function HistoryPage() {
                     <td>{run.period_start || '—'} — {run.period_end || '—'}</td>
                     <td>{formatDate(run.created_at)}</td>
                     <td className="actions">
-                      <Link className="btn btn-secondary" href={`/reconciliation/${id}`}>Открыть</Link>
-                      <Link className="btn btn-ghost" href={`/reconciliation/${id}/report`}>Отчёт</Link>
-                      <Link className="btn btn-ghost" href={`/reconciliation/${id}/tables`}>Таблицы</Link>
+                      <Link className="btn btn-primary" href={`/reconciliation/${id}`}>Открыть</Link>
+                      <Link className="btn btn-primary" href={`/reconciliation/${id}/report`}>Отчёт</Link>
+                      <Link className="btn btn-primary" href={`/reconciliation/${id}/tables`}>Таблицы</Link>
                     </td>
                   </tr>;
                 })}

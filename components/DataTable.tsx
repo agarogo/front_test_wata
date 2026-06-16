@@ -30,7 +30,7 @@ function CopyButton({ value }: { value: unknown }) {
       await navigator.clipboard.writeText(String(value ?? ''));
     } catch {}
   }
-  return <button type="button" className="btn btn-ghost" onClick={copy}>copy</button>;
+  return <button type="button" className="btn btn-primary" onClick={copy}>copy</button>;
 }
 
 export default function DataTable<T extends Row>({
@@ -94,9 +94,9 @@ export default function DataTable<T extends Row>({
         </table>
       </div>
       <div className="actions">
-        <button type="button" className="btn btn-secondary" disabled={safePage <= 1} onClick={() => setPage((p) => Math.max(1, p - 1))}>Назад</button>
+        <button type="button" className="btn btn-primary" disabled={safePage <= 1} onClick={() => setPage((p) => Math.max(1, p - 1))}>Назад</button>
         <span className="muted small">Страница {safePage} из {totalPages}. Всего строк: {filteredRows.length}</span>
-        <button type="button" className="btn btn-secondary" disabled={safePage >= totalPages} onClick={() => setPage((p) => Math.min(totalPages, p + 1))}>Вперёд</button>
+        <button type="button" className="btn btn-primary" disabled={safePage >= totalPages} onClick={() => setPage((p) => Math.min(totalPages, p + 1))}>Вперёд</button>
       </div>
     </div>
   );

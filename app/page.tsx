@@ -58,7 +58,7 @@ export default function DashboardPage() {
           <p>Загрузка Excel, расчёт сверки из БД, отчёты и промежуточные таблицы.</p>
         </div>
         <div className="actions">
-          <Link className="btn" href="/reconciliation/new">Новая сверка</Link>
+          <Link className="btn btn-primary" href="/reconciliation/new">Новая сверка</Link>
           <Link className="btn btn-secondary" href="/reconciliation/history">История/проверка БД</Link>
           <Link className="btn btn-secondary" href="/database">БД</Link>
         </div>
@@ -88,7 +88,7 @@ export default function DashboardPage() {
           <Link className="btn btn-secondary" href="/reconciliation/history">Открыть историю</Link>
         </div>
         {loading && runs.length === 0 ? <LoadingState label="Загрузка запусков..." /> : runs.length === 0 ? (
-          <EmptyState title="Пока нет запусков" description="Создай новую сверку, после этого запуск появится в списке." action={<Link className="btn" href="/reconciliation/new">Создать сверку</Link>} />
+          <EmptyState title="Пока нет запусков" description="Создай новую сверку, после этого запуск появится в списке." action={<Link className="btn btn-primary" href="/reconciliation/new">Создать сверку</Link>} />
         ) : (
           <div className="table-container">
             <table>

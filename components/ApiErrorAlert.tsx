@@ -11,7 +11,7 @@ export default function ApiErrorAlert({ error, title = 'Ошибка', onRetry }
         <strong>{title}</strong>
         <p>{message}</p>
       </div>
-      {onRetry && <button className="btn btn-secondary" onClick={onRetry}>Повторить</button>}
+      {onRetry && <button className="btn btn-primary" onClick={onRetry}>Повторить</button>}
     </div>
   );
 }

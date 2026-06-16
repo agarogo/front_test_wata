@@ -65,8 +65,8 @@ export default function UploadPage({ params }: { params: Promise<{ run_id: strin
           <p>Вставьте массив объектов для WATA или OnliPay и загрузите данные.</p>
         </div>
         <div className="actions">
-          <Link className="btn btn-secondary" href={`/reconciliation/${runId}`}>К запуску</Link>
-          <Link className="btn btn-secondary" href={`/reconciliation/${runId}/tables`}>Таблицы</Link>
+          <Link className="btn btn-primary" href={`/reconciliation/${runId}`}>К запуску</Link>
+          <Link className="btn btn-primary" href={`/reconciliation/${runId}/tables`}>Таблицы</Link>
         </div>
       </div>
 
@@ -77,7 +77,7 @@ export default function UploadPage({ params }: { params: Promise<{ run_id: strin
         <div className="card">
           <div className="card-header"><div className="card-title">Данные WATA</div></div>
           <textarea value={wataJson} onChange={(e) => setWataJson(e.target.value)} />
-          <button className="btn" onClick={uploadWata} disabled={loading}>Загрузить WATA</button>
+          <button className="btn btn-primary" onClick={uploadWata} disabled={loading}>Загрузить WATA</button>
         </div>
         <div className="card">
           <div className="card-header"><div className="card-title">Данные OnliPay</div></div>
@@ -85,7 +85,7 @@ export default function UploadPage({ params }: { params: Promise<{ run_id: strin
             {groups.map((item) => <option key={item} value={item}>{item}</option>)}
           </select>
           <textarea value={onlipayJson} onChange={(e) => setOnlipayJson(e.target.value)} />
-          <button className="btn" onClick={uploadOnliPay} disabled={loading}>Загрузить OnliPay</button>
+          <button className="btn btn-primary" onClick={uploadOnliPay} disabled={loading}>Загрузить OnliPay</button>
         </div>
       </div>
     </div>

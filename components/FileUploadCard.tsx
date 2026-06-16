@@ -20,7 +20,7 @@ export default function FileUploadCard({
         {description && <p>{description}</p>}
         {uploadMessage && <span className={`badge badge-${uploadStatus === 'success' ? 'success' : uploadStatus === 'error' ? 'danger' : 'muted'}`}>{uploadMessage}</span>}
       </div>
-      {onUpload && <button className="btn btn-secondary" onClick={() => void onUpload()} disabled={uploadStatus === 'uploading'}>{uploadStatus === 'uploading' ? 'Загрузка...' : 'Выбрать / загрузить'}</button>}
+      {onUpload && <button className="btn btn-primary" onClick={() => void onUpload()} disabled={uploadStatus === 'uploading'}>{uploadStatus === 'uploading' ? 'Загрузка...' : 'Выбрать / загрузить'}</button>}
     </div>
   );
 }

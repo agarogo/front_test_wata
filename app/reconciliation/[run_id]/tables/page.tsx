@@ -102,7 +102,7 @@ export default function TablesPage({ params }: { params: Promise<{ run_id: strin
 
       {loading && !Object.keys(tables).length ? <LoadingState label="Загрузка таблиц..." /> : error ? <ApiErrorAlert error={error} title="Ошибка загрузки таблиц" onRetry={() => load(false)} /> : (
         <div className="card">
-          <div className="actions">{availableNames.map((name) => <button key={name} className={active === name ? 'btn' : 'btn btn-secondary'} onClick={() => setActive(name)}>{tableLabels[name] || name}</button>)}</div>
+          <div className="actions">{availableNames.map((name) => <button key={name} className={active === name ? 'btn btn-primary' : 'btn btn-primary'} onClick={() => setActive(name)}>{tableLabels[name] || name}</button>)}</div>
           {rows.length ? <DataTable rows={rows} columns={columns} emptyTitle="Таблицы пока пустые" /> : <EmptyState title="Таблицы пока пустые" description={tableLabels[active] || active} />}
         </div>
       )}
