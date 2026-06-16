@@ -24,7 +24,11 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         </Link>
         <nav className="sidebar-nav">
           {navItems.map((item) => (
-            <Link key={item.href} href={item.href} className={`nav-item ${pathname === item.href || (item.href !== '/' && pathname.startsWith(item.href)) ? 'active' : ''}`}>
+            <Link
+              key={item.href}
+              href={item.href}
+              className={`nav-item ${pathname === item.href || (item.href !== '/' && pathname.startsWith(item.href)) ? 'active' : ''}`}
+            >
               {item.label}
             </Link>
           ))}
