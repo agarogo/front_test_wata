@@ -4,18 +4,9 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { createRun, createRunFromExcel, getRunId } from '../../../lib/api';
+import { upsertCachedRun, setCachedRunDetail } from '../../../lib/run-cache';
 import type { CreateReconciliationRunRequest, ReconciliationRun } from '../../../lib/types';
 import ApiErrorAlert from '../../../components/ApiErrorAlert';
-
-const LOCAL_RUNS_KEY = 'onlipay_reconciliation_runs';
-
-function saveLocalRun(run: ReconciliationRun) {
-  try {
-    const current = JSON.parse(localStorage.getItem(LOCAL_RUNS_KEY) || '[]') as ReconciliationRun[];
-    const id = getRunId(run);
-    localStorage.setItem(LOCAL_RUNS_KEY, JSON.stringify([run, ...current.filter((item) => getRunId(item) !== id)].slice(0, 50)));
-  } catch {}
-}
 
 const initialForm = {
   period_start: '',
@@ -86,8 +77,24 @@ export default function NewReconciliationPage() {
             wata_case_rub_amount: form.wata_case_rub_amount || '0',
           })
         : await createRun(payload);
-      saveLocalRun(run);
+      
       const id = getRunId(run);
+      
+      const summary: Partial<ReconciliationRun> & { id?: string | number; run_id?: string | number } = {
+        id: run.id ?? run.run_id,
+        run_id: run.run_id ?? run.id,
+        status: run.status ?? 'pending',
+        period_start: run.period_start,
+        period_end: run.period_end,
+        created_at: run.created_at ?? new Date().toISOString(),
+      };
+      
+      upsertCachedRun(summary);
+      
+      if (id && run) {
+        setCachedRunDetail(id, run);
+      }
+      
       router.push(id ? `/reconciliation/${id}` : '/reconciliation/history');
     } catch (err) {
       setError(err);

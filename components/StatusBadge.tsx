@@ -6,6 +6,7 @@ const labels: Record<string, string> = {
   accepted: 'Принято',
   failed: 'Ошибка',
   processing: 'В обработке',
+  pending: 'В обработке',
   completed: 'Завершено',
 };
 

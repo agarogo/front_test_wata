@@ -3,6 +3,7 @@
 import { use, useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { getReport, getReportTxtUrl, getReportXlsxUrl } from '../../../../lib/api';
+import { getCachedReport, setCachedReport } from '../../../../lib/run-cache';
 import type { FinancialReport } from '../../../../lib/types';
 import ApiErrorAlert from '../../../../components/ApiErrorAlert';
 import EmptyState from '../../../../components/EmptyState';
@@ -19,14 +20,28 @@ export default function ReportPage({ params }: { params: Promise<{ run_id: strin
   const [report, setReport] = useState<FinancialReport | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<unknown>(null);
+  const [showCachedWarning, setShowCachedWarning] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
+    setShowCachedWarning(false);
+    
+    const cached = getCachedReport(runId);
+    if (cached) {
+      setReport(cached as FinancialReport);
+    }
+    
     try {
-      setReport(await getReport(runId));
+      const fetched = await getReport(runId);
+      setReport(fetched);
+      setCachedReport(runId, fetched);
     } catch (err) {
-      setError(err);
+      if (cached) {
+        setShowCachedWarning(true);
+      } else {
+        setError(err);
+      }
     } finally {
       setLoading(false);
     }
@@ -37,6 +52,10 @@ export default function ReportPage({ params }: { params: Promise<{ run_id: strin
     return () => window.clearTimeout(timer);
   }, [load]);
 
+  async function handleRefresh() {
+    await load();
+  }
+
   return (
     <div className="page">
       <div className="page-header">
@@ -46,13 +65,14 @@ export default function ReportPage({ params }: { params: Promise<{ run_id: strin
           <p>Итоговые суммы, расхождения и скачивание отчёта.</p>
         </div>
         <div className="actions">
+          <button className="btn btn-secondary" onClick={handleRefresh} disabled={loading}>Обновить отчёт</button>
           <a className="btn" href={getReportXlsxUrl(runId)}>Скачать XLSX</a>
           <a className="btn btn-secondary" href={getReportTxtUrl(runId)}>Скачать TXT</a>
           <Link className="btn btn-secondary" href={`/reconciliation/${runId}`}>К запуску</Link>
         </div>
       </div>
 
-      {loading ? <LoadingState label="Загрузка отчёта..." /> : error ? (
+      {loading && !report ? <LoadingState label="Загрузка отчёта..." /> : error ? (
         <div className="card">
           <ApiErrorAlert error={error} title="Отчёт пока не сформирован" onRetry={load} />
           <EmptyState title="Отчёт пока не сформирован" description="Запусти расчёт, после этого отчёт появится здесь." />
@@ -60,6 +80,7 @@ export default function ReportPage({ params }: { params: Promise<{ run_id: strin
       ) : (
         <div className="card">
           <div className="card-header"><div className="card-title">Итоги</div></div>
+          {showCachedWarning && <div className="alert" style={{ marginTop: '0.5rem' }}><strong>Показаны сохранённые данные</strong></div>}
           <div className="table-container"><table><tbody>
             <Row label="amount_8_1" value={report?.amount_8_1} />
             <Row label="Gateway missing in WATA" value={report?.gateway_missing_in_wata_current ?? report?.gateway_missing_in_wata_current_total} />

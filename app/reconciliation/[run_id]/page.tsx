@@ -3,6 +3,7 @@
 import { use, useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { acceptRun, calculateRun, getReportTxtUrl, getReportXlsxUrl, getRun, getRunCounts } from '../../../lib/api';
+import { getCachedRunDetail, setCachedRunDetail, upsertCachedRun } from '../../../lib/run-cache';
 import type { ReconciliationRun, RunCounts } from '../../../lib/types';
 import ApiErrorAlert from '../../../components/ApiErrorAlert';
 import LoadingState from '../../../components/LoadingState';
@@ -23,6 +24,7 @@ export default function RunDetailPage({ params }: { params: Promise<{ run_id: st
   const [actionLoading, setActionLoading] = useState(false);
   const [error, setError] = useState<unknown>(null);
   const [message, setMessage] = useState<string | null>(null);
+  const [showCachedWarning, setShowCachedWarning] = useState(false);
 
   const status = String(run?.status || 'draft');
   const canCalculate = ['draft', 'data_loaded', 'loaded', 'failed'].includes(status);
@@ -31,13 +33,36 @@ export default function RunDetailPage({ params }: { params: Promise<{ run_id: st
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
+    setShowCachedWarning(false);
+    
+    const cached = getCachedRunDetail(runId);
+    if (cached) {
+      setRun(cached);
+    }
+    
     try {
       const [runResult, countsResult] = await Promise.allSettled([getRun(runId), getRunCounts(runId)]);
-      if (runResult.status === 'fulfilled') setRun(runResult.value);
-      else throw runResult.reason;
-      if (countsResult.status === 'fulfilled') setCounts(countsResult.value);
+      
+      if (runResult.status === 'fulfilled') {
+        const freshRun = runResult.value;
+        setRun(freshRun);
+        setCachedRunDetail(runId, freshRun);
+        upsertCachedRun(freshRun);
+      } else {
+        if (cached) {
+          setShowCachedWarning(true);
+        } else {
+          throw runResult.reason;
+        }
+      }
+      
+      if (countsResult.status === 'fulfilled') {
+        setCounts(countsResult.value);
+      }
     } catch (err) {
-      setError(err);
+      if (!cached) {
+        setError(err);
+      }
     } finally {
       setLoading(false);
     }
@@ -47,6 +72,10 @@ export default function RunDetailPage({ params }: { params: Promise<{ run_id: st
     const timer = window.setTimeout(() => void load(), 0);
     return () => window.clearTimeout(timer);
   }, [load]);
+
+  async function handleRefresh() {
+    await load();
+  }
 
   async function handleCalculate() {
     setActionLoading(true);
@@ -86,23 +115,25 @@ export default function RunDetailPage({ params }: { params: Promise<{ run_id: st
     ['Обновлён', formatDate(run?.updated_at)],
   ]), [run, runId]);
 
-  if (loading) return <LoadingState label="Загрузка запуска..." />;
+  if (loading && !run) return <LoadingState label="Загрузка запуска..." />;
 
   return (
     <div className="page">
       <div className="page-header">
         <div>
           <div className="page-eyebrow">Запуск</div>
-          <h1>Сверка {runId.slice(0, 8)}</h1>
+          <h1>Сверка {runId.length > 8 ? runId.slice(0, 8) : runId}</h1>
           <p>Детали запуска, загрузка данных, расчёт, отчёты и принятие результата.</p>
         </div>
         <div className="actions">
+          <button className="btn btn-secondary" onClick={handleRefresh} disabled={loading}>Обновить</button>
           <Link className="btn btn-secondary" href="/reconciliation/history">История</Link>
           <Link className="btn" href={`/reconciliation/${runId}/upload`}>Загрузка данных</Link>
         </div>
       </div>
 
       {error ? <ApiErrorAlert error={error} title="Ошибка запуска" onRetry={load} /> : null}
+      {showCachedWarning && <div className="alert"><strong>Показаны сохранённые данные</strong></div>}
       {message && <div className="alert"><strong>{message}</strong></div>}
 
       <ReconciliationSummaryCards run={run} counts={counts} />
@@ -123,11 +154,17 @@ export default function RunDetailPage({ params }: { params: Promise<{ run_id: st
             {canCalculate ? <button className="btn" onClick={handleCalculate} disabled={actionLoading}>Запустить расчёт</button> : null}
             {canAccept ? <button className="btn btn-secondary" onClick={handleAccept} disabled={actionLoading}>Принять сверку</button> : null}
             {status === 'accepted' ? <span className="badge badge-success">Принято</span> : null}
-            <a className="btn btn-secondary" href={getReportXlsxUrl(runId)}>XLSX</a>
-            <a className="btn btn-secondary" href={getReportTxtUrl(runId)}>TXT</a>
-            <Link className="btn btn-secondary" href={`/reconciliation/${runId}/report`}>Открыть отчёт</Link>
-            <Link className="btn btn-secondary" href={`/reconciliation/${runId}/tables`}>Промежуточные таблицы</Link>
           </div>
+        </div>
+      </div>
+
+      <div className="card">
+        <div className="card-header"><div className="card-title">Отчёты</div></div>
+        <div className="actions">
+          <a className="btn" href={getReportXlsxUrl(runId)}>Скачать XLSX</a>
+          <a className="btn btn-secondary" href={getReportTxtUrl(runId)}>Скачать TXT</a>
+          <Link className="btn btn-secondary" href={`/reconciliation/${runId}/report`}>Открыть отчёт</Link>
+          <Link className="btn btn-secondary" href={`/reconciliation/${runId}/tables`}>Таблицы</Link>
         </div>
       </div>
     </div>
