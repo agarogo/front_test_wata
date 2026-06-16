@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { use, useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { getReport, getReportTxtUrl, getReportXlsxUrl } from '../../../../lib/api';
 import type { FinancialReport } from '../../../../lib/types';
@@ -13,8 +13,9 @@ function Row({ label, value, usdt = false }: { label: string; value: unknown; us
   return <tr><td>{label}</td><td>{typeof value === 'number' || typeof value === 'string' ? <MoneyValue value={value} currency={usdt ? 'USDT' : 'RUB'} /> : '—'}</td></tr>;
 }
 
-export default function ReportPage({ params }: { params: { run_id: string } }) {
-  const runId = decodeURIComponent(params.run_id);
+export default function ReportPage({ params }: { params: Promise<{ run_id: string }> }) {
+  const { run_id } = use(params);
+  const runId = decodeURIComponent(run_id);
   const [report, setReport] = useState<FinancialReport | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<unknown>(null);

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { use, useState } from 'react';
 import Link from 'next/link';
 import { uploadOnliPayPayments, uploadWataPayments } from '../../../../lib/api';
 import type { OnliPayTransaction, WataTransaction } from '../../../../lib/types';
@@ -16,8 +16,9 @@ function parseArray<T>(value: string): T[] {
   return parsed as T[];
 }
 
-export default function UploadPage({ params }: { params: { run_id: string } }) {
-  const runId = decodeURIComponent(params.run_id);
+export default function UploadPage({ params }: { params: Promise<{ run_id: string }> }) {
+  const { run_id } = use(params);
+  const runId = decodeURIComponent(run_id);
   const [wataJson, setWataJson] = useState(wataSample);
   const [onlipayJson, setOnlipayJson] = useState(onlipaySample);
   const [group, setGroup] = useState(groups[0]);

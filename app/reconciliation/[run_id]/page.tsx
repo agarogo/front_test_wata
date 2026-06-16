@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { use, useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { acceptRun, calculateRun, getReportTxtUrl, getReportXlsxUrl, getRun, getRunCounts } from '../../../lib/api';
 import type { ReconciliationRun, RunCounts } from '../../../lib/types';
@@ -14,8 +14,9 @@ function formatDate(value?: string) {
   return value.replace('T', ' ').slice(0, 16);
 }
 
-export default function RunDetailPage({ params }: { params: { run_id: string } }) {
-  const runId = decodeURIComponent(params.run_id);
+export default function RunDetailPage({ params }: { params: Promise<{ run_id: string }> }) {
+  const { run_id } = use(params);
+  const runId = decodeURIComponent(run_id);
   const [run, setRun] = useState<ReconciliationRun | null>(null);
   const [counts, setCounts] = useState<RunCounts | null>(null);
   const [loading, setLoading] = useState(true);

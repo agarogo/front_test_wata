@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { use, useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { getTables } from '../../../../lib/api';
 import ApiErrorAlert from '../../../../components/ApiErrorAlert';
@@ -34,8 +34,9 @@ function rowsFromValue(value: unknown): Record<string, unknown>[] {
   return [];
 }
 
-export default function TablesPage({ params }: { params: { run_id: string } }) {
-  const runId = decodeURIComponent(params.run_id);
+export default function TablesPage({ params }: { params: Promise<{ run_id: string }> }) {
+  const { run_id } = use(params);
+  const runId = decodeURIComponent(run_id);
   const [tables, setTables] = useState<Record<string, unknown>>({});
   const [active, setActive] = useState(tableNames[0]);
   const [loading, setLoading] = useState(true);
