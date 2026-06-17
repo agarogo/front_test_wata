@@ -11,8 +11,12 @@
   --muted: #6b7280;
   --border: #d6dbe5;
   --danger: #dc2626;
+  --danger-hover: #b91c1c;
   --warning: #d97706;
   --success: #16a34a;
+  --success-hover: #15803d;
+  --light: #e5e7eb;
+  --light-hover: #d1d5db;
   --radius: 8px;
 }
 
@@ -62,7 +66,11 @@ h3 { font-size: 16px; margin: 0; color: var(--text); }
 .card-title { font-size: 15px; font-weight: 700; color: var(--text); }
 .actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 
-/* Buttons - Demo presentation styles */
+/* ========================================
+   BUTTON STYLES - Demo Presentation
+   ======================================== */
+
+/* Base button - default blue for demo */
 .btn {
   display: inline-flex;
   align-items: center;
@@ -145,11 +153,11 @@ h3 { font-size: 16px; margin: 0; color: var(--text); }
 /* Ghost buttons */
 .btn-ghost {
   background: transparent;
-  color: #16a34a;
-  border: 1px solid #86efac;
+  color: #2563eb;
+  border: 1px solid #93c5fd;
 }
 .btn-ghost:hover {
-  background: #dcfce7;
+  background: #dbeafe;
 }
 
 /* Small buttons */
@@ -158,14 +166,14 @@ h3 { font-size: 16px; margin: 0; color: var(--text); }
   font-size: 13px;
 }
 
-/* Legacy button compatibility - keep existing button styles working */
+/* Legacy button compatibility */
 button {
   border: none;
   cursor: pointer;
   border-radius: 8px;
   padding: 8px 14px;
   font-weight: 600;
-  background: #16a34a;
+  background: #2563eb;
   color: #fff;
   display: inline-flex;
   align-items: center;
@@ -174,7 +182,7 @@ button {
   transition: background 0.15s;
 }
 button:hover {
-  background: #15803d;
+  background: #1d4ed8;
 }
 button:disabled {
   opacity: 0.55;

@@ -81,7 +81,7 @@ export default function CommissionsPage() {
           <p>Ставки для групп, используемых в сверке.</p>
         </div>
         <div className="actions">
-          <button className="btn btn-primary" onClick={load}>Обновить</button>
+          <button className="btn btn-secondary" onClick={load}>Обновить</button>
           <button className="btn btn-primary" onClick={reset}>Сбросить</button>
         </div>
       </div>
